@@ -15,11 +15,11 @@ public class Variable extends JSONToString {
         this.value = value;
     }
 
-    public Value get(String key) {
+    public Value get(String key) throws Exception {
         return value.get(key);
     }
 
-    public Value put(String key, Value value) {
+    public Value put(String key, Value value) throws Exception {
         return this.value.put(key, value);
     }
 }

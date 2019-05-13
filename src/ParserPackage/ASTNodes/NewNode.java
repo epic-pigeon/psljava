@@ -1,21 +1,28 @@
 package ParserPackage.ASTNodes;
 
+import ParserPackage.Collection;
+
 public class NewNode extends Node {
-    private Node call;
+    private Node clazz;
+    private Collection<Node> arguments;
     @Override
     public String getType() {
         return "new";
     }
 
-    public NewNode(Node call) {
-        this.call = call;
+    public Node getClazz() {
+        return clazz;
     }
 
-    public void setCall(Node call) {
-        this.call = call;
+    public void setClazz(Node clazz) {
+        this.clazz = clazz;
     }
 
-    public Node getCall() {
-        return call;
+    public Collection<Node> getArguments() {
+        return arguments;
+    }
+
+    public void setArguments(Collection<Node> arguments) {
+        this.arguments = arguments;
     }
 }

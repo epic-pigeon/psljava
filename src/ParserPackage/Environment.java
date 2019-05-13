@@ -146,54 +146,56 @@ public class Environment {
         ));
         DEFAULT_ENVIRONMENT.defBinaryOperator(".", new BinaryOperator(
                 (node1, node2, environment) -> {
-                    Value value = Evaluator.evaluate(node1, environment);
+                    Value value2 = Evaluator.evaluate(node1, environment);
                     String prop;
                     if (node2.getType().equals("variable")) {
                         prop = ((VariableNode) node2).getValue();
                     } else {
                         prop = Evaluator.evaluate(node2, environment).toString();
                     }
-                    if (value.isSettable()) {
-                        if (value.get(prop) == null) value.put(prop, Value.NULL);
-                        return new SettableValue(value.get(prop)) {
+                    if (value2.isSettable()) {
+                        if (value2.get(prop) == null) value2.put(prop, Value.NULL);
+                        return new SettableValue(value2.get(prop)) {
                             @Override
                             public Value set(Value value1) throws Exception {
-                                return value.put(prop, value1);
+                                return value2.put(prop, value1);
                             }
 
                             @Override
                             public Value setProp(String name, Value value1) throws Exception {
-                                return value.get(prop).put(name, value1);
+                                return value2.get(prop).put(name, value1);
                             }
                         };
-                    } else return value.get(prop);
+                    } else return value2.get(prop);
                 }, 200
         ));
         Value system = new Value(null);
         Value stdout = new Value(null);
-        stdout.put("println", new Value(
-                new PSLFunction() {
-                    @Override
-                    public Value apply(Value thiz, Collection<Value> args, Environment environment) throws Exception {
-                        for (Value arg: args) {
-                            System.out.println(arg);
+        try {
+            stdout.put("println", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Value thiz, Collection<Value> args, Environment environment) throws Exception {
+                            for (Value arg : args) {
+                                System.out.println(arg);
+                            }
+                            return Value.NULL;
                         }
-                        return Value.NULL;
                     }
-                }
-        ));
-        stdout.put("print", new Value(
-                new PSLFunction() {
-                    @Override
-                    public Value apply(Value thiz, Collection<Value> args, Environment environment) throws Exception {
-                        for (Value arg: args) {
-                            System.out.print(arg);
+            ));
+            stdout.put("print", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Value thiz, Collection<Value> args, Environment environment) throws Exception {
+                            for (Value arg : args) {
+                                System.out.print(arg);
+                            }
+                            return Value.NULL;
                         }
-                        return Value.NULL;
                     }
-                }
-        ));
-        system.put("stdout", stdout);
+            ));
+            system.put("stdout", stdout);
+        } catch (Exception ignored) {}
         DEFAULT_ENVIRONMENT.defVariable("system", system);
         DEFAULT_ENVIRONMENT.defVariable("null", Value.NULL);
     }

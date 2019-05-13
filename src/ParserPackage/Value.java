@@ -12,8 +12,8 @@ public class Value //extends JSONToString
     public boolean isSettable() {
         return false;
     }
-    private Object value;
-    private HashMap<String, Value> properties = new HashMap<>();
+    protected Object value;
+    protected HashMap<String, Value> properties = new HashMap<>();
 
     public Value(Object value) {
         this.value = value;
@@ -38,7 +38,7 @@ public class Value //extends JSONToString
         return properties.get(key);
     }
 
-    public Value put(String key, Value value) {
+    public Value put(String key, Value value) throws Exception {
         return properties.put(key, value);
     }
 

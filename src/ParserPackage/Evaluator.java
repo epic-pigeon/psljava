@@ -3,6 +3,7 @@ package ParserPackage;
 import ParserPackage.ASTNodes.*;
 import jdk.nashorn.internal.codegen.CompilerConstants;
 
+import java.beans.EventSetDescriptor;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -72,7 +73,7 @@ public class Evaluator {
                         }
 
                         @Override
-                        public Value setProp(String name, Value value) {
+                        public Value setProp(String name, Value value) throws Exception {
                             variable.put(name, value);
                             return value;
                         }
@@ -205,26 +206,42 @@ public class Evaluator {
                 return val;
             case "new":
                 NewNode newNode = (NewNode) node;
-                Value thiz = Value.NULL;
-                Environment scope = environment.extend();
-                scope.setThiz(new SettableValue(thiz) {
-                    @Override
-                    public Value set(Value value) throws Exception {
-                        thiz.setValue(value.getValue());
-                        return thiz;
+                System.out.println(environment.getVariables());
+                return ((PSLClass) Evaluator.evaluate(newNode.getClazz(), environment)).instantiate(newNode.getArguments().map(node1 -> {
+                    try {
+                        return Evaluator.evaluate(node1, environment);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        return null;
                     }
-
-                    @Override
-                    public Value setProp(String name, Value value) throws Exception {
-                        return thiz.put(name, value);
-                    }
-                });
-                evalCall(newNode.getCall(), scope);
-                return thiz;
+                }));
             case "class":
                 PSLClass pslClass = new PSLClass(environment);
-
-
+                ClassNode classNode = (ClassNode) node;
+                HashMap<String, PSLClassField> statics = new HashMap<>();
+                HashMap<String, PSLClassField> prototype = new HashMap<>();
+                for (Map.Entry<String, ClassFieldNode> entry: classNode.getFields().entrySet()) {
+                    if (entry.getValue().isStatic()) {
+                        statics.put(entry.getKey(), (PSLClassField) Evaluator.evaluate(entry.getValue(), pslClass.getScope()));
+                    } else {
+                        prototype.put(entry.getKey(), (PSLClassField) Evaluator.evaluate(entry.getValue(), pslClass.getScope()));
+                    }
+                }
+                pslClass.setPrototype(prototype);
+                pslClass.setStatics(statics);
+                return pslClass;
+            case "field":
+                PSLClassField pslClassField = new PSLClassField();
+                ClassFieldNode classFieldNode = (ClassFieldNode) node;
+                if (classFieldNode.getGetAction() != null)
+                    pslClassField.setOnGet((PSLFunction) Evaluator.evaluate(classFieldNode.getGetAction(), environment).getValue());
+                if (classFieldNode.getSetAction() != null)
+                    pslClassField.setOnSet((PSLFunction) Evaluator.evaluate(classFieldNode.getSetAction(), environment).getValue());
+                pslClassField.setGetModifier(classFieldNode.getGetModifier());
+                pslClassField.setSetModifier(classFieldNode.getSetModifier());
+                if (classFieldNode.getValue() != null)
+                    pslClassField.setValue(Evaluator.evaluate(classFieldNode.getValue(), environment));
+                return pslClassField;
             default: throw new Exception("Don't know how to evaluate " + node.getType());
         }
     }
@@ -292,7 +309,8 @@ abstract class PSLFunction {
 
 class PSLClass extends Value {
     private Environment scope;
-    private HashMap<String, PSLClassField> properties;
+    private HashMap<String, PSLClassField> prototype;
+    private HashMap<String, PSLClassField> statics;
     public PSLClass(Environment environment) {
         super(null);
         scope = environment.extend();
@@ -301,11 +319,57 @@ class PSLClass extends Value {
 
     @Override
     public Value get(String key) throws Exception {
-        return properties.get(key).get(this, scope);
+        return statics.get(key).get(this, scope);
+    }
+
+    @Override
+    public Value put(String key, Value value) throws Exception {
+        return statics.get(key).set(this, value, scope);
+    }
+
+    public Environment getScope() {
+        return scope;
+    }
+
+    public void setScope(Environment scope) {
+        this.scope = scope;
+    }
+
+    public HashMap<String, PSLClassField> getPrototype() {
+        return prototype;
+    }
+
+    public void setPrototype(HashMap<String, PSLClassField> prototype) {
+        this.prototype = prototype;
+    }
+
+    public HashMap<String, PSLClassField> getStatics() {
+        return statics;
+    }
+
+    public void setStatics(HashMap<String, PSLClassField> statics) {
+        this.statics = statics;
+        for (Map.Entry<String, PSLClassField> entry: statics.entrySet()) {
+            try {
+                this.properties.put(entry.getKey(), entry.getValue().get(this, scope));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    public Value instantiate(Collection<Value> args) throws Exception {
+        Value result = new Value(null);
+        PSLClassField constructor = prototype.get("constructor");
+        ((PSLFunction) constructor.getValue().getValue()).apply(result, args, scope);
+        return result;
     }
 }
 
-class PSLClassField {
+class PSLClassField extends Value {
+    public PSLClassField() {
+        super(null);
+    }
     private Value value;
     private PSLFunction onGet;
     private AccessModifiers getModifier;
@@ -328,6 +392,46 @@ class PSLClassField {
                 return onSet.apply(clazz, new Collection<>(val), scope);
             }
         } else throw new Exception("Setting is " + setModifier);
+    }
+
+    public Value getValue() {
+        return value;
+    }
+
+    public void setValue(Value value) {
+        this.value = value;
+    }
+
+    public PSLFunction getOnGet() {
+        return onGet;
+    }
+
+    public void setOnGet(PSLFunction onGet) {
+        this.onGet = onGet;
+    }
+
+    public AccessModifiers getGetModifier() {
+        return getModifier;
+    }
+
+    public void setGetModifier(AccessModifiers getModifier) {
+        this.getModifier = getModifier;
+    }
+
+    public PSLFunction getOnSet() {
+        return onSet;
+    }
+
+    public void setOnSet(PSLFunction onSet) {
+        this.onSet = onSet;
+    }
+
+    public AccessModifiers getSetModifier() {
+        return setModifier;
+    }
+
+    public void setSetModifier(AccessModifiers setModifier) {
+        this.setModifier = setModifier;
     }
 }
 

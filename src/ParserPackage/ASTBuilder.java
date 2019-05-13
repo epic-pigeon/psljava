@@ -112,7 +112,10 @@ public class ASTBuilder {
     }
     private static NewNode parseNew() throws Exception {
         skipToken("NEW");
-        return new NewNode(parseExpression());
+        NewNode newNode = new NewNode();
+        newNode.setClazz(parseNoCallAtom());
+        newNode.setArguments(parseArguments());
+        return newNode;
     }
     private static Collection<ParameterNode> parseParameters() throws Exception {
         return delimited("LEFT_PAREN", "COMMA", "RIGHT_PAREN", () -> {
@@ -226,17 +229,20 @@ public class ASTBuilder {
             }
         }
     }
-    private static CallNode parseCall(Node function) throws Exception {
-        CallNode node = new CallNode();
-        node.setFunction(function);
-        node.setArguments(delimited("LEFT_PAREN", "COMMA", "RIGHT_PAREN", () -> {
+    private static Collection<Node> parseArguments() throws Exception {
+        return delimited("LEFT_PAREN", "COMMA", "RIGHT_PAREN", () -> {
             try {
                 return parseExpression();
             } catch (Exception e) {
                 e.printStackTrace();
                 return null;
             }
-        }));
+        });
+    }
+    private static CallNode parseCall(Node function) throws Exception {
+        CallNode node = new CallNode();
+        node.setFunction(function);
+        node.setArguments(parseArguments());
         return node;
     }
     private static IfNode parseIf() throws Exception {
