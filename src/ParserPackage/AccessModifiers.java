@@ -1,14 +1,16 @@
 package ParserPackage;
 
 public enum AccessModifiers {
-    PRIVATE("private"),
-    PUBLIC("public"),
-    DISABLED("disabled"),
-    PROTECTED("protected");
+    PUBLIC("public", 0),
+    PROTECTED("protected", 1),
+    PRIVATE("private", 2),
+    DISABLED("disabled", 3);
 
     private String name;
-    AccessModifiers(String name) {
+    private int strictness;
+    AccessModifiers(String name, int strictness) {
         this.name = name;
+        this.strictness = strictness;
     }
 
     public String getName() {
@@ -20,5 +22,9 @@ public enum AccessModifiers {
             if (accessModifier.getName().equals(name)) return accessModifier;
         }
         return null;
+    }
+
+    public boolean stricter(AccessModifiers accessModifier) {
+        return this.strictness > accessModifier.strictness;
     }
 }

@@ -1,11 +1,8 @@
 package ParserPackage;
 
-import ParserPackage.ASTNodes.BinaryNode;
-import ParserPackage.ASTNodes.Node;
 import ParserPackage.ASTNodes.VariableNode;
 
 import java.util.HashMap;
-import java.util.function.Function;
 
 public class Environment {
     private HashMap<String, Variable> variables = new HashMap<>();
@@ -154,11 +151,15 @@ public class Environment {
                         prop = Evaluator.evaluate(node2, environment).toString();
                     }
                     if (value2.isSettable()) {
-                        if (value2.get(prop) == null) value2.put(prop, Value.NULL);
-                        return new SettableValue(value2.get(prop)) {
+                        Value val = value2.get(prop);
+                        if (val == null) {
+                            value2.put(prop, Value.NULL);
+                            val = Value.NULL;
+                        }
+                        return new SettableValue(val) {
                             @Override
                             public Value set(Value value1) throws Exception {
-                                return value2.put(prop, value1);
+                                return ((SettableValue)value2).setProp(prop, value1);
                             }
 
                             @Override
@@ -171,11 +172,20 @@ public class Environment {
         ));
         Value system = new Value(null);
         Value stdout = new Value(null);
+        Value math = new Value(null);
         try {
+            math.put("random", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> t) throws Exception {
+                            return new Value(Math.random());
+                        }
+                    }
+            ));
             stdout.put("println", new Value(
                     new PSLFunction() {
                         @Override
-                        public Value apply(Value thiz, Collection<Value> args, Environment environment) throws Exception {
+                        public Value apply(Collection<Value> args) throws Exception {
                             for (Value arg : args) {
                                 System.out.println(arg);
                             }
@@ -186,7 +196,7 @@ public class Environment {
             stdout.put("print", new Value(
                     new PSLFunction() {
                         @Override
-                        public Value apply(Value thiz, Collection<Value> args, Environment environment) throws Exception {
+                        public Value apply(Collection<Value> args) throws Exception {
                             for (Value arg : args) {
                                 System.out.print(arg);
                             }
@@ -198,6 +208,15 @@ public class Environment {
         } catch (Exception ignored) {}
         DEFAULT_ENVIRONMENT.defVariable("system", system);
         DEFAULT_ENVIRONMENT.defVariable("null", Value.NULL);
+        DEFAULT_ENVIRONMENT.defVariable("math", math);
+        DEFAULT_ENVIRONMENT.defVariable("typeof", new Value(
+                new PSLFunction() {
+                    @Override
+                    public Value apply(Collection<Value> t) throws Exception {
+                        return new Value(t.get(0).getClass());
+                    }
+                }
+        ));
     }
 
     public Value getThiz() {
