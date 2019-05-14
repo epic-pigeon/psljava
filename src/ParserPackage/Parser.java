@@ -61,6 +61,7 @@ public class Parser {
         compile(filename, toFilename, Environment.DEFAULT_ENVIRONMENT);
     }
     public static void compile(String filename, String toFilename, Environment environment) throws Exception {
+        System.out.println("Reading file...");
         File file = new File(filename);
         FileInputStream fis = new FileInputStream(file);
         byte[] data = new byte[(int) file.length()];
@@ -84,7 +85,8 @@ public class Parser {
         Collection<Rule> rules = new Collection<>(operatorRule);
         rules.addAll(Parser.rules);
 
-        TokenHolder tokenHolder = new Lexer().lex(code, rules, toSkip);
+        System.out.println("Lexing...");
+        TokenHolder tokenHolder = new Lexer().lexFully(code, rules, toSkip);
 
         //System.out.println(tokenHolder);
 
@@ -92,12 +94,15 @@ public class Parser {
         for (Map.Entry<String, BinaryOperator> entry: environment.getBinaryOperators().entrySet()) {
             precedence.put(entry.getKey(), entry.getValue().getPrecedence());
         }
+        System.out.println("Building AST...");
         Node program = ASTBuilder.build(tokenHolder, precedence, 100, true);
 
+        System.out.println("Writing to file...");
         FileOutputStream fileOut = new FileOutputStream(toFilename);
         ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
         objectOut.writeObject(program);
         objectOut.close();
+        System.out.println("Finished!");
     }
     public static Value run(String filename) throws Exception {
         FileInputStream fileInputStream = new FileInputStream(filename);
@@ -144,7 +149,7 @@ public class Parser {
             precedence.put(entry.getKey(), entry.getValue().getPrecedence());
         }
         Node program = ASTBuilder.build(tokenHolder, precedence, 100, false, true, environment);
-        System.out.println(program);
+        //System.out.println(program);
 
         Value result = Evaluator.evaluate(program, Environment.DEFAULT_ENVIRONMENT);
         //System.out.println("Properties: " + result.getProperties());

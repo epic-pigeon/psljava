@@ -11,6 +11,41 @@ public class Lexer {
     private Rule toSkip;
     private int position;
 
+    public TokenHolder lexFully(String code, Collection<Rule> rules, Rule toSkip) throws LexingException {
+        position = 0;
+        tokens = new Collection<>();
+        this.code = code;
+        this.rules = rules;
+        this.toSkip = toSkip;
+        while (position < code.length()) {
+            for (Pattern pattern : toSkip.getPatterns()) {
+                Matcher skipMatcher = pattern.matcher(code.substring(position));
+                if (skipMatcher.find() && skipMatcher.start() == 0) {
+                    position += skipMatcher.end();
+                    break;
+                }
+            }
+            if (position >= code.length()) break;
+
+            try {
+                for (Rule rule : rules) {
+                    for (Pattern pattern : rule.getPatterns()) {
+                        Matcher matcher = pattern.matcher(code.substring(position));
+                        if (matcher.find() && matcher.start() == 0) {
+                            tokens.add(new Token(rule.getName(), matcher.group(), position, matcher.group().split("\\r?\\r").length - 1));
+                            position += matcher.group().length();
+                            throw new ContinueException();
+                        }
+                    }
+                }
+            } catch (ContinueException ignored) {
+                continue;
+            }
+            throw new LexingException(tokens, position);
+        }
+        return new TokenHolder(tokens);
+    }
+
     public TokenHolder lex(String code, Collection<Rule> rules, Rule toSkip) throws LexingException {
         position = 0;
         tokens = new Collection<>();
