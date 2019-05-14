@@ -13,6 +13,9 @@ public class Collection<T> extends ArrayList<T> {
     public Collection(T... args) {
         super(Arrays.asList(args));
     }
+    public Collection(List<T> list) {
+        super(list);
+    }
     public<E> Collection<E> map(Function<T, E> fn) {
         Collection<E> collection = new Collection<>();
         for (T obj: this) collection.add(fn.apply(obj));
@@ -52,5 +55,11 @@ public class Collection<T> extends ArrayList<T> {
         Collection<E> collection = new Collection<>();
         for (T element: this) collection.add(clazz.cast(element));
         return collection;
+    }
+    public Collection<T> slice(int start, int end) {
+        return new Collection<>(subList(start, end));
+    }
+    public Collection<T> slice(int start) {
+        return slice(start, size());
     }
 }

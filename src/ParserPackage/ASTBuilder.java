@@ -1,11 +1,9 @@
 package ParserPackage;
 
 import ParserPackage.ASTNodes.*;
-import com.sun.xml.internal.ws.server.sei.EndpointValueSetter;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 
@@ -219,7 +217,7 @@ public class ASTBuilder {
         });
     }
     private static Node parseExpression() throws Exception {
-        return maybeCall(() -> {
+        return maybeCallOrIndex(() -> {
             try {
                 return maybeBinary(parseAtom(), 0);
             } catch (Exception e) {
@@ -236,15 +234,30 @@ public class ASTBuilder {
                 )
         );
     }
-    private static Node maybeCall(Supplier<Node> parser) throws Exception {
+    private static Node maybeCallOrIndex(Supplier<Node> parser) throws Exception {
         Node expr = parser.get();
         while (true) {
             if (checkToken("LEFT_PAREN")) {
                 expr = parseCall(expr);
+            } else if (checkToken("LEFT_SQUARE_PAREN")) {
+                expr = parseIndex(expr);
             } else {
                 return expr;
             }
         }
+    }
+    private static IndexNode parseIndex(Node value) throws Exception {
+        IndexNode indexNode = new IndexNode(value);
+        skipToken("LEFT_SQUARE_PAREN");
+        indexNode.setBegin(parseExpression());
+        if (checkAndSkip("TO") != null) {
+            indexNode.setRange(true);
+            if (checkAndSkip("END") == null) {
+                indexNode.setEnd(parseExpression());
+            }
+        }
+        skipToken("RIGHT_SQUARE_PAREN");
+        return indexNode;
     }
     private static Collection<Node> parseArguments() throws Exception {
         return delimited("LEFT_PAREN", "COMMA", "RIGHT_PAREN", () -> {
@@ -290,7 +303,7 @@ public class ASTBuilder {
         if (precedence > functionPrecedence) {
             return parseNoCallAtom();
         } else {
-            return maybeCall(() -> {
+            return maybeCallOrIndex(() -> {
                 try {
                     return parseNoCallAtom();
                 } catch (Exception e) {
@@ -337,12 +350,26 @@ public class ASTBuilder {
                     return parseString();
                 } else if (checkToken("NEW")) {
                     return parseNew();
+                } else if (checkToken("LEFT_SQUARE_PAREN")) {
+                    return parseArray();
                 } else throw new Exception("Unexpected token " + tokenHolder.lookUp());
             } catch (Exception e) {
                 e.printStackTrace();
                 return null;
             }
         });
+    }
+    private static ArrayNode parseArray() throws Exception {
+        ArrayNode arrayNode = new ArrayNode();
+        arrayNode.setArray(delimited("LEFT_SQUARE_PAREN", "COMMA", "RIGHT_SQUARE_PAREN", () -> {
+            try {
+                return parseExpression();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+        }));
+        return arrayNode;
     }
     private static ClassNode parseClass() throws Exception {
         skipToken("CLASS");

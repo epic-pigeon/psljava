@@ -16,6 +16,8 @@ public class Parser {
             new Rule("LEFT_PAREN", Pattern.compile("\\(")),
             new Rule("RIGHT_PAREN", Pattern.compile("\\)")),
             new Rule("LEFT_CURLY_PAREN", Pattern.compile("\\{")),
+            new Rule("LEFT_SQUARE_PAREN", Pattern.compile("\\[")),
+            new Rule("RIGHT_SQUARE_PAREN", Pattern.compile("]")),
             new Rule("RIGHT_CURLY_PAREN", Pattern.compile("}")),
             new Rule("COMMA", Pattern.compile(",")),
             new Rule("PROPERTY_OPERATOR", Pattern.compile("\\.")),
@@ -38,6 +40,8 @@ public class Parser {
             new Rule("OVERRIDE", Pattern.compile("override")),
             new Rule("STATIC", Pattern.compile("static")),
             new Rule("FROM", Pattern.compile("from")),
+            new Rule("TO", Pattern.compile("to")),
+            new Rule("END", Pattern.compile("end")),
             new Rule("EVERYTHING", Pattern.compile("everything")),
             new Rule("RETURN", Pattern.compile("return")),
             new Rule("MULTILINE_COMMENT", Pattern.compile("/\\*([^/])*\\*/"))

@@ -3,6 +3,7 @@ package ParserPackage;
 import ParserPackage.ASTNodes.*;
 
 import java.io.File;
+import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
@@ -101,7 +102,7 @@ public class Evaluator {
                 }
             case "export":
                 Node exportedNode = ((ExportNode) node).getValue();
-                String as = ((ExportNode) node).getAs();
+                String as = ((ExportNode) node).getAlias();
                 Value evaluated = Evaluator.evaluate(exportedNode, environment);
                 if (as == null) {
                     try {
@@ -274,6 +275,51 @@ public class Evaluator {
                 if (classFieldNode.getValue() != null)
                     pslClassField.setDefaultValue(Evaluator.evaluate(classFieldNode.getValue(), environment));
                 return pslClassField;
+            case "if":
+                IfNode ifNode = (IfNode) node;
+                if (toBoolean(Evaluator.evaluate(ifNode.getCondition(), environment))) {
+                    return Evaluator.evaluate(ifNode.getThen(), environment);
+                } else {
+                    if (ifNode.getOtherwise() != null) {
+                        return Evaluator.evaluate(ifNode.getOtherwise(), environment);
+                    } else return Value.NULL;
+                }
+            case "array":
+                Collection<Value> array = new Collection<>();
+                for (Node node1 : ((ArrayNode) node).getArray()) {
+                    array.add(Evaluator.evaluate(node1, environment));
+                }
+                return new Value(array);
+            case "index":
+                IndexNode indexNode = (IndexNode) node;
+                Value value = Evaluator.evaluate(indexNode.getValue(), environment);
+                if (value.getValue().getClass() == Collection.class) {
+                    Collection<Value> arr = (Collection<Value>) value.getValue();
+                    if (indexNode.isRange()) {
+                        Value start = Evaluator.evaluate(indexNode.getBegin(), environment);
+                        if (start.getValue().getClass() == Double.class) {
+                            int begin = ((Double) start.getValue()).intValue();
+                            if (indexNode.getEnd() == null) {
+                                return new Value(arr.slice(begin));
+                            } else {
+                                Value finish = Evaluator.evaluate(indexNode.getEnd(), environment);
+                                if (finish.getValue().getClass() == Double.class) {
+                                    int end = ((Double) finish.getValue()).intValue();
+                                    return new Value(arr.slice(begin, end));
+                                }
+                            }
+                        } else {
+                            throw new Exception("Index value should be an integer");
+                        }
+                    } else {
+                        Value index = Evaluator.evaluate(indexNode.getBegin(), environment);
+                        if (index.getValue().getClass() == Double.class) {
+                            return arr.get(((Double) index.getValue()).intValue());
+                        } else {
+                            throw new Exception("Index value should be an integer");
+                        }
+                    }
+                } else throw new Exception("Bad value for index");
             default: throw new Exception("Don't know how to evaluate " + node.getType());
         }
     }
@@ -330,6 +376,16 @@ public class Evaluator {
         Exception throwable = new Exception(reason);
         throwable.printStackTrace();
         return throwable;
+    }
+    private static boolean toBoolean(Value value) {
+        Object val = value.getValue();
+        if (val.getClass() == String.class) {
+            return ((String) val).length() > 0;
+        } else if (val.getClass() == Double.class) {
+            return ((Double) val) != 0;
+        } else if (val.getClass() == Boolean.class) {
+            return (Boolean) val;
+        } else return value != null;
     }
 }
 

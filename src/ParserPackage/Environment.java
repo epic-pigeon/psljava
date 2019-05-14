@@ -205,7 +205,9 @@ public class Environment {
                     }
             ));
             system.put("stdout", stdout);
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+            new Exception("Internal Error").printStackTrace();
+        }
         DEFAULT_ENVIRONMENT.defVariable("system", system);
         DEFAULT_ENVIRONMENT.defVariable("null", Value.NULL);
         DEFAULT_ENVIRONMENT.defVariable("math", math);
@@ -217,6 +219,8 @@ public class Environment {
                     }
                 }
         ));
+        DEFAULT_ENVIRONMENT.defVariable("true", new Value(true));
+        DEFAULT_ENVIRONMENT.defVariable("false", new Value(false));
     }
 
     public Value getThiz() {

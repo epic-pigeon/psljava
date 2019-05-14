@@ -2,7 +2,7 @@ package ParserPackage.ASTNodes;
 
 public class ExportNode extends Node {
     private Node value;
-    private String as;
+    private String alias;
     @Override
     public String getType() {
         return "export";
@@ -16,16 +16,16 @@ public class ExportNode extends Node {
         this.value = value;
     }
 
-    public ExportNode(Node value, String as) {
+    public ExportNode(Node value, String alias) {
         this.value = value;
-        this.as = as;
+        this.alias = alias;
     }
 
-    public String getAs() {
-        return as;
+    public String getAlias() {
+        return alias;
     }
 
-    public void setAs(String as) {
-        this.as = as;
+    public void setAlias(String alias) {
+        this.alias = alias;
     }
 }
