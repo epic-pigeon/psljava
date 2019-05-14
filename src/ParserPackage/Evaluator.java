@@ -8,7 +8,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class Evaluator {
-    private static HashMap<String, Value> EXPORTS = new HashMap<>();
+    public static HashMap<String, Value> EXPORTS = new HashMap<>();
     public static Value evaluate(Node node, Environment environment) throws Exception {
         switch (node.getType()) {
             case "program":

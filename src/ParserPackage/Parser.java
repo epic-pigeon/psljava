@@ -92,7 +92,7 @@ public class Parser {
         for (Map.Entry<String, BinaryOperator> entry: environment.getBinaryOperators().entrySet()) {
             precedence.put(entry.getKey(), entry.getValue().getPrecedence());
         }
-        ProgramNode program = ASTBuilder.build(tokenHolder, precedence, 100, true);
+        Node program = ASTBuilder.build(tokenHolder, precedence, 100, true);
 
         FileOutputStream fileOut = new FileOutputStream(toFilename);
         ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
@@ -143,7 +143,7 @@ public class Parser {
         for (Map.Entry<String, BinaryOperator> entry: environment.getBinaryOperators().entrySet()) {
             precedence.put(entry.getKey(), entry.getValue().getPrecedence());
         }
-        ProgramNode program = ASTBuilder.build(tokenHolder, precedence, 100);
+        Node program = ASTBuilder.build(tokenHolder, precedence, 100, false, true, environment);
         System.out.println(program);
 
         Value result = Evaluator.evaluate(program, Environment.DEFAULT_ENVIRONMENT);

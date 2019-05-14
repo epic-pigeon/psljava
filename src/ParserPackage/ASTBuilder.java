@@ -8,25 +8,42 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+
 public class ASTBuilder {
     private static TokenHolder tokenHolder;
     private static HashMap<String, Integer> precedence;
     private static int functionPrecedence;
     private static boolean resolveImport;
-    public static ProgramNode build(TokenHolder tokens, HashMap<String, Integer> precedence, int functionPrecedence) throws Exception {
+    public static Node build(TokenHolder tokens, HashMap<String, Integer> precedence, int functionPrecedence) throws Exception {
         return build(tokens, precedence, functionPrecedence, false);
     }
-    public static ProgramNode build(TokenHolder tokens, HashMap<String, Integer> precedence, int functionPrecedence, boolean resolveImport) throws Exception {
+    public static Node build(TokenHolder tokens, HashMap<String, Integer> precedence, int functionPrecedence, boolean resolveImport) throws Exception {
+        return build(tokens, precedence, functionPrecedence, resolveImport, false, null);
+    }
+    public static Node build(TokenHolder tokens, HashMap<String, Integer> precedence, int functionPrecedence,
+                                    boolean resolveImport, boolean executeImmediately, Environment environment) throws Exception {
         ASTBuilder.precedence = precedence;
         ASTBuilder.functionPrecedence = functionPrecedence;
         ASTBuilder.resolveImport = resolveImport;
         tokenHolder = tokens;
-        ProgramNode node = new ProgramNode();
-        while (tokenHolder.hasNext()) {
-            node.addNode(parseExpression());
-            checkAndSkip("SEMICOLON");
+        if (!executeImmediately) {
+            ProgramNode node = new ProgramNode();
+            while (tokenHolder.hasNext()) {
+                node.addNode(parseExpression());
+                checkAndSkip("SEMICOLON");
+            }
+            return node;
+        } else {
+            Value returnValue = new Value(null);
+            HashMap<String, Value> exports = Evaluator.EXPORTS;
+            Evaluator.EXPORTS = new HashMap<>();
+            while (tokenHolder.hasNext()) {
+                Evaluator.evaluate(parseExpression(), environment);
+            }
+            returnValue.setProperties(Evaluator.EXPORTS);
+            Evaluator.EXPORTS = exports;
+            return new ValueNode(returnValue);
         }
-        return node;
     }
     private static Token checkAndSkip(String type) throws Exception {
         return checkToken(type) ? skipToken(type) : null;
