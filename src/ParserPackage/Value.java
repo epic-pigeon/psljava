@@ -1,10 +1,7 @@
 package ParserPackage;
 
 import java.io.Serializable;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
 public class Value //extends JSONToString
     implements Serializable
@@ -15,7 +12,15 @@ public class Value //extends JSONToString
     protected Object value;
     protected HashMap<String, Value> properties = new HashMap<>();
 
+    public Value() {
+        this(null);
+    }
     public Value(Object value) {
+        if (value instanceof Double) {
+            if ((Double) value == ((Double) value).intValue()) {
+                value = ((Double) value).intValue();
+            }
+        }
         this.value = value;
     }
 
@@ -85,5 +90,31 @@ public class Value //extends JSONToString
 
     public void putAll(Map<? extends String, ? extends Value> m) {
         properties.putAll(m);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return equals(obj, true);
+    }
+
+    public boolean equals(Object obj, boolean strict) {
+        if (obj instanceof Value) {
+            Value value = (Value) obj;
+            if (!compareValues(getValue(), value.getValue(), strict)) return false;
+            for (Map.Entry<String, Value> entry: properties.entrySet()) {
+                if (value.properties.containsKey(entry.getKey())
+                 && value.properties.get(entry.getKey()).equals(entry.getValue(), strict)) {
+
+                } else return false;
+            }
+            return true;
+        } else return super.equals(obj);
+    }
+    private static boolean compareValues(Object obj1, Object obj2, boolean strict) {
+        if (!strict) {
+            return String.valueOf(obj1).equals(String.valueOf(obj2));
+        } else {
+            return Objects.equals(obj1, obj2) && obj1.getClass() == obj2.getClass();
+        }
     }
 }

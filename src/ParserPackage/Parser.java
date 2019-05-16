@@ -7,9 +7,13 @@ import sun.awt.Symbol;
 
 import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class Parser {
     private static final Collection<Rule> rules = new Collection<>(
@@ -20,14 +24,18 @@ public class Parser {
             new Rule("RIGHT_SQUARE_PAREN", Pattern.compile("]")),
             new Rule("RIGHT_CURLY_PAREN", Pattern.compile("}")),
             new Rule("COMMA", Pattern.compile(",")),
-            new Rule("PROPERTY_OPERATOR", Pattern.compile("\\.")),
-            new Rule("ASSIGN", Pattern.compile("=")),
-            new Rule("CAST_OPERATOR", Pattern.compile(":")),
+            new Rule("SINGLE_LINE_COMMENT", Pattern.compile("//[^\n]*")),
             new Rule("NUMBER", Pattern.compile("\\d+(\\.\\d+)?")),
             new Rule("STRING", Pattern.compile("('([^']|(\\\\.))*')|(\"([^\"]|(\\\\.))*\")")),
             new Rule("SEMICOLON", Pattern.compile(";")),
             new Rule("FUNCTION", Pattern.compile("function")),
+            new Rule("WHEN", Pattern.compile("when")),
+            new Rule("EXPAND", Pattern.compile("\\.\\.\\.")),
+            new Rule("COLON", Pattern.compile(":")),
             new Rule("EXPORT", Pattern.compile("export")),
+            new Rule("WHILE", Pattern.compile("while")),
+            new Rule("FOR", Pattern.compile("for")),
+            new Rule("IN", Pattern.compile("in")),
             new Rule("AS", Pattern.compile("as")),
             new Rule("NEW", Pattern.compile("new")),
             new Rule("IF", Pattern.compile("if")),
@@ -36,12 +44,15 @@ public class Parser {
             new Rule("BUILT", Pattern.compile("built")),
             new Rule("CLASS", Pattern.compile("class")),
             new Rule("GET", Pattern.compile("get")),
+            new Rule("INITIALIZER", Pattern.compile("initializer")),
             new Rule("SET", Pattern.compile("set")),
             new Rule("OVERRIDE", Pattern.compile("override")),
+            new Rule("PRECEDENCE", Pattern.compile("precedence")),
+            new Rule("OPERATOR_KEYWORD", Pattern.compile("operator")),
+            new Rule("BINARY", Pattern.compile("binary")),
+            new Rule("UNARY", Pattern.compile("unary")),
             new Rule("STATIC", Pattern.compile("static")),
             new Rule("FROM", Pattern.compile("from")),
-            new Rule("TO", Pattern.compile("to")),
-            new Rule("END", Pattern.compile("end")),
             new Rule("EVERYTHING", Pattern.compile("everything")),
             new Rule("RETURN", Pattern.compile("return")),
             new Rule("MULTILINE_COMMENT", Pattern.compile("/\\*([^/])*\\*/"))
@@ -76,7 +87,12 @@ public class Parser {
 
         Rule operatorRule = new Rule("OPERATOR", new Collection<>());
 
-        for (String name: environment.getBinaryOperators().keySet()) {
+        Set<String> set = Stream.concat(
+                environment.getBinaryOperators().keySet().stream(),
+                environment.getUnaryOperators().keySet().stream()).collect(Collectors.toSet());
+        for (String name: new Collection<>(set.toArray())
+                                .to(String.class)
+                                .qsort((o1, o2) -> o2.length() - o1.length())) {
             StringBuilder stringBuilder = new StringBuilder();
             for (Character character: name.toCharArray()) {
                 stringBuilder.append("\\").append(character);
@@ -86,8 +102,7 @@ public class Parser {
             );
         }
 
-        Collection<Rule> rules = new Collection<>(operatorRule);
-        rules.addAll(Parser.rules);
+        Parser.rules.add(operatorRule);
 
         System.out.println("Lexing...");
         TokenHolder tokenHolder = new Lexer().lexFully(code, rules, toSkip);
@@ -100,7 +115,7 @@ public class Parser {
         }
         System.out.println("Building AST...");
         Node program = ASTBuilder.build(tokenHolder, precedence, 100, true);
-
+        //System.out.println(program);
         System.out.println("Writing to file...");
         FileOutputStream fileOut = new FileOutputStream(toFilename);
         ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
@@ -131,7 +146,12 @@ public class Parser {
 
         Rule operatorRule = new Rule("OPERATOR", new Collection<>());
 
-        for (String name: environment.getBinaryOperators().keySet()) {
+        Set<String> set = Stream.concat(
+                environment.getBinaryOperators().keySet().stream(),
+                environment.getUnaryOperators().keySet().stream()).collect(Collectors.toSet());
+        for (String name: new Collection<>(set.toArray())
+                            .to(String.class)
+                            .qsort((o1, o2) -> o2.length() - o1.length())) {
             StringBuilder stringBuilder = new StringBuilder();
             for (Character character: name.toCharArray()) {
                 stringBuilder.append("\\").append(character);
@@ -141,10 +161,9 @@ public class Parser {
             );
         }
         //System.out.println(operatorRule.getPatterns());
-        Collection<Rule> rules = new Collection<>(operatorRule);
-        rules.addAll(Parser.rules);
+        Parser.rules.add(operatorRule);
 
-        TokenHolder tokenHolder = new Lexer().lex(code, rules, toSkip);
+        TokenHolder tokenHolder = new Lexer().lexFully(code, rules, toSkip);
 
         //System.out.println(tokenHolder);
 

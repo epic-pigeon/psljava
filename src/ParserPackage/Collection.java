@@ -1,5 +1,6 @@
 package ParserPackage;
 
+import java.lang.reflect.Array;
 import java.util.*;
 import java.util.function.Function;
 
@@ -57,9 +58,15 @@ public class Collection<T> extends ArrayList<T> {
         return collection;
     }
     public Collection<T> slice(int start, int end) {
-        return new Collection<>(subList(start, end));
+        return new Collection<>(subList(start, end + 1));
     }
     public Collection<T> slice(int start) {
-        return slice(start, size());
+        return slice(start, size() - 1);
+    }
+
+    public Collection<T> qsort(Comparator<? super T> comparator) {
+        ArrayList<T> arr = new ArrayList<>(this);
+        arr.sort(comparator);
+        return new Collection<>(arr);
     }
 }

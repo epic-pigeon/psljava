@@ -21,7 +21,7 @@ public class TokenHolder {
 
     public String toString() {
         StringBuilder stringBuilder = new StringBuilder("[\n    ");
-        for (int i = 0; i < tokens.size(); i++) {
+        for (int i = 0; i < getTokens().size(); i++) {
             if (i != 0) stringBuilder.append(",\n    ");
             stringBuilder.append(tokens.get(i).toString());
         }
@@ -29,15 +29,15 @@ public class TokenHolder {
         return stringBuilder.toString();
     }
 
-    public boolean hasNext() {
+    public boolean hasNext() throws Exception {
         return tokens.size() > position;
     }
 
-    public Token next() {
+    public Token next() throws Exception {
         return tokens.get(position++);
     }
 
-    public Token lookUp() {
+    public Token lookUp() throws Exception {
         return hasNext() ? tokens.get(position) : null;
     }
 

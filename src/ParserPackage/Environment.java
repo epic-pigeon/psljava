@@ -2,11 +2,15 @@ package ParserPackage;
 
 import ParserPackage.ASTNodes.VariableNode;
 
-import java.util.HashMap;
+import java.io.File;
+import java.io.FileInputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class Environment {
     private HashMap<String, Variable> variables = new HashMap<>();
     private HashMap<String, BinaryOperator> binaryOperators = new HashMap<>();
+    private HashMap<String, UnaryOperator> unaryOperators = new HashMap<>();
     private Value thiz = Value.NULL;
     private Environment parent;
     public Environment(Environment parent) {
@@ -42,7 +46,7 @@ public class Environment {
         } else {
             defVariable(name, value);
         }
-        return getVariable(name);
+        return new Variable(value);
     }
     public Variable deleteVariable(String name) {
         return variables.remove(name);
@@ -101,17 +105,124 @@ public class Environment {
                     Object value1 = v1.getValue();
                     Object value2 = v2.getValue();
                     Value result;
-                    if (value1.getClass() == Double.class) {
-                        if (value2.getClass() == Double.class) {
-                            result = new Value(((Double) value1) + ((Double) value2));
+                    if (value1 instanceof Number) {
+                        if (value2 instanceof Number) {
+                            result = new Value(((Number) value1).doubleValue() + ((Number) value2).doubleValue());
                         } else {
-                            result = new Value(String.valueOf(value1) + value2);
+                            result = new Value(value1 + String.valueOf(value2));
                         }
                     } else {
                         result = new Value(String.valueOf(value1) + value2);
                     }
                     result.putAll(v1.getProperties());
                     result.putAll(v2.getProperties());
+                    return result;
+                }, 20
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("*", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value v1 = Evaluator.evaluate(node1, environment);
+                    Value v2 = Evaluator.evaluate(node2, environment);
+                    Object value1 = v1.getValue();
+                    Object value2 = v2.getValue();
+                    Value result;
+                    if (value1 instanceof Number) {
+                        if (value2 instanceof Number) {
+                            result = new Value(((Number) value1).doubleValue() * ((Number) value2).doubleValue());
+                        } else {
+                            result = new Value(new Collection<>(Collections.nCopies(((Number) value1).intValue(), String.valueOf(value2))).join(""));
+                        }
+                    } else {
+                        if (value2 instanceof Number) {
+                            result = new Value(new Collection<>(Collections.nCopies(((Number) value2).intValue(), String.valueOf(value1))).join(""));
+                        } else {
+                            throw new Exception("Invalid multipliers");
+                        }
+                    }
+                    return result;
+                }, 30
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("/", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value v1 = Evaluator.evaluate(node1, environment);
+                    Value v2 = Evaluator.evaluate(node2, environment);
+                    Object value1 = v1.getValue();
+                    Object value2 = v2.getValue();
+                    Value result;
+                    if (value1 instanceof Number && value2 instanceof Number) {
+                        result = new Value(((Number) value1).doubleValue() / ((Number) value2).doubleValue());
+                    } else throw new Exception("Both arguments should be numbers");
+                    return result;
+                }, 30
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("==", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value v1 = Evaluator.evaluate(node1, environment);
+                    Value v2 = Evaluator.evaluate(node2, environment);
+                    return new Value((v1 == v2) || (v1 != null && v1.equals(v2, false)));
+                }, 18
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("..", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value v1 = Evaluator.evaluate(node1, environment);
+                    Value v2 = Evaluator.evaluate(node2, environment);
+                    if (v1.value instanceof Number && v2.value instanceof Number) {
+                        int start = ((Number) v1.value).intValue();
+                        int end = ((Number) v2.value).intValue();
+                        Collection<Value> result = new Collection<>();
+                        for (int i = start; i < end; i++) {
+                            result.add(new Value((double) i));
+                        }
+                        return new Value(result);
+                    } else throw new Exception("Both values should be numbers");
+                }, 18
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("===", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value v1 = Evaluator.evaluate(node1, environment);
+                    Value v2 = Evaluator.evaluate(node2, environment);
+                    return new Value(Objects.equals(v1, v2));
+                }, 18
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("<", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value v1 = Evaluator.evaluate(node1, environment);
+                    Value v2 = Evaluator.evaluate(node2, environment);
+                    if (v1.getValue() instanceof Number && v2.getValue() instanceof Number) {
+                        return new Value(((Number) v1.getValue()).doubleValue() < ((Number) v2.getValue()).doubleValue());
+                    } else throw new Exception("Not numbers");
+                }, 18
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator(">", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value v1 = Evaluator.evaluate(node1, environment);
+                    Value v2 = Evaluator.evaluate(node2, environment);
+                    if (v1.getValue() instanceof Number && v2.getValue() instanceof Number) {
+                        return new Value(((Number) v1.getValue()).doubleValue() > ((Number) v2.getValue()).doubleValue());
+                    } else throw new Exception("Not numbers");
+                }, 18
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("-", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value v1 = Evaluator.evaluate(node1, environment);
+                    Value v2 = Evaluator.evaluate(node2, environment);
+                    Object value1 = v1.getValue();
+                    Object value2 = v2.getValue();
+                    Value result;
+                    if (value1 instanceof Number) {
+                        if (value2 instanceof Number) {
+                            result = new Value(((Number) value1).doubleValue() - ((Number) value2).doubleValue());
+                        } else {
+                            result = new Value(substract(String.valueOf(value1), String.valueOf(value2)));
+                        }
+                    } else {
+                        result = new Value(substract(String.valueOf(value1), String.valueOf(value2)));
+                    }
+                    for (Map.Entry<String, Value> entry : v1.properties.entrySet()) {
+                        if (!v2.properties.containsKey(entry.getKey())) {
+                            result.properties.put(entry.getKey(), entry.getValue());
+                        }
+                    }
                     return result;
                 }, 20
         ));
@@ -140,6 +251,60 @@ public class Environment {
                         }
                     } else throw new Exception(v1 + " is not an lvalue");
                 }, 10
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("||", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value value1 = Evaluator.evaluate(node1, environment);
+                    if (Evaluator.toBoolean(value1)) {
+                        return value1;
+                    } else {
+                        Value value2 = Evaluator.evaluate(node2, environment);
+                        if (Evaluator.toBoolean(value2)) {
+                            return value2;
+                        } else {
+                            return new Value(false);
+                        }
+                    }
+                }, 15
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("<<", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value value1 = Evaluator.evaluate(node1, environment);
+                    if (value1.get("write") != null) {
+                        Value value2 = Evaluator.evaluate(node2, environment);
+                        ((PSLFunction) value1.get("write").getValue()).apply(new Collection<>(value2));
+                        return value1;
+                    } else {
+                        throw new Exception("Is not a stream");
+                    }
+                }, 12
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator(">>", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value value1 = Evaluator.evaluate(node1, environment);
+                    if (value1.get("read") != null) {
+                        Value value2 = Evaluator.evaluate(node2, environment);
+                        ((SettableValue) value2).set(((PSLFunction) value1.get("read").getValue()).apply(new Collection<>(value2)));
+                        return value1;
+                    } else {
+                        throw new Exception("Is not a stream");
+                    }
+                }, 12
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("&&", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value value1 = Evaluator.evaluate(node1, environment);
+                    if (!Evaluator.toBoolean(value1)) {
+                        return new Value(false);
+                    } else {
+                        Value value2 = Evaluator.evaluate(node2, environment);
+                        if (Evaluator.toBoolean(value2)) {
+                            return value2;
+                        } else {
+                            return new Value(false);
+                        }
+                    }
+                }, 15
         ));
         DEFAULT_ENVIRONMENT.defBinaryOperator(".", new BinaryOperator(
                 (node1, node2, environment) -> {
@@ -171,7 +336,9 @@ public class Environment {
                 }, 200
         ));
         Value system = new Value(null);
+        Value fs = new Value(null);
         Value stdout = new Value(null);
+        Value stdin = new Value(null);
         Value math = new Value(null);
         try {
             math.put("random", new Value(
@@ -204,11 +371,97 @@ public class Environment {
                         }
                     }
             ));
+            Value streamValue = new Value();
+            streamValue.put("write", new Value(new PSLFunction() {
+                @Override
+                public Value apply(Collection<Value> t) throws Exception {
+                    for (Value arg : t) {
+                        System.out.print(arg);
+                    }
+                    return Value.NULL;
+                }
+            }));
+            stdout.put("stream", streamValue);
+            Value inLineStream = new Value();
+            inLineStream.put("read", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> t) throws Exception {
+                            return new Value(new Scanner(System.in).nextLine());
+                        }
+                    }
+            ));
+            Value inWordStream = new Value();
+            inWordStream.put("read", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> t) throws Exception {
+                            return new Value(new Scanner(System.in).next());
+                        }
+                    }
+            ));
+            stdin.put("line_stream", inLineStream);
+            stdin.put("word_stream", inWordStream);
+            stdin.put("read_line", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> t) throws Exception {
+                            return new Value(new Scanner(System.in).nextLine());
+                        }
+                    }
+            ));
+            stdin.put("read_number", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> t) throws Exception {
+                            return new Value(new Scanner(System.in).nextDouble());
+                        }
+                    }
+            ));
+            stdin.put("read_word", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> t) throws Exception {
+                            return new Value(new Scanner(System.in).next());
+                        }
+                    }
+            ));
+            stdin.put("read_char", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> t) throws Exception {
+                            return new Value(new Scanner(System.in).nextLine().substring(0, 1));
+                        }
+                    }
+            ));
+            fs.put("file_from", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> t) throws Exception {
+                             String filename = (String) t.get(0).getValue();
+                             File file = new File(filename);
+                             Value result = new Value(filename);
+                             result.put("read", new Value(
+                                     new PSLFunction() {
+                                         @Override
+                                         public Value apply(Collection<Value> t) throws Exception {
+                                             byte[] data = new byte[(int) file.length()];
+                                             new FileInputStream(file).read(data);
+                                             return new Value(new String(data, StandardCharsets.UTF_8));
+                                         }
+                                     }
+                             ));
+                             return result;
+                        }
+                    }
+            ));
             system.put("stdout", stdout);
+            system.put("stdin", stdin);
         } catch (Exception ignored) {
             new Exception("Internal Error").printStackTrace();
         }
         DEFAULT_ENVIRONMENT.defVariable("system", system);
+        DEFAULT_ENVIRONMENT.defVariable("fs", fs);
         DEFAULT_ENVIRONMENT.defVariable("null", Value.NULL);
         DEFAULT_ENVIRONMENT.defVariable("math", math);
         DEFAULT_ENVIRONMENT.defVariable("typeof", new Value(
@@ -221,6 +474,60 @@ public class Environment {
         ));
         DEFAULT_ENVIRONMENT.defVariable("true", new Value(true));
         DEFAULT_ENVIRONMENT.defVariable("false", new Value(false));
+        DEFAULT_ENVIRONMENT.defUnaryOperator("-", new UnaryOperator(
+                (node, environment) -> {
+                    Value value = Evaluator.evaluate(node, environment);
+                    if (value.getValue() instanceof Number) {
+                        return new Value(-((Number) value.getValue()).doubleValue());
+                    } else throw new Exception("Invalid value");
+                }
+        ));
+        DEFAULT_ENVIRONMENT.defUnaryOperator("++", new UnaryOperator(
+                (node, environment) -> {
+                    Value value = Evaluator.evaluate(node, environment);
+                    if (value.isSettable()) {
+                        Object val = value.value;
+                        if (val instanceof Number) {
+                            return ((SettableValue) value).set(new Value(((Number) val).doubleValue() + 1));
+                        } else throw new Exception("Invalid value");
+                    } else throw new Exception("Immutable value");
+                }
+        ));
+    }
+
+    public HashMap<String, UnaryOperator> getUnaryOperators() {
+        return unaryOperators;
+    }
+
+    public void setUnaryOperators(HashMap<String, UnaryOperator> unaryOperators) {
+        this.unaryOperators = unaryOperators;
+    }
+
+    public UnaryOperator defUnaryOperator(String name, UnaryOperator operator) {
+        return unaryOperators.put(name, operator);
+    }
+
+    public Environment lookUpUnaryOperator(String name) {
+        Environment environment = this;
+        while (environment != null) {
+            if (environment.unaryOperators.containsKey(name)) return environment;
+            environment = environment.parent;
+        }
+        return null;
+    }
+    public UnaryOperator getUnaryOperator(String name) {
+        return unaryOperators.getOrDefault(name, null);
+    }
+
+    public UnaryOperator setUnaryOperator(String name, UnaryOperator operator) {
+        Environment environment = lookUpUnaryOperator(name);
+        if (environment == null && parent != null) return null;
+        if (getUnaryOperator(name) != null) {
+            unaryOperators.put(name, operator);
+        } else {
+            defUnaryOperator(name, operator);
+        }
+        return getUnaryOperator(name);
     }
 
     public Value getThiz() {
@@ -229,5 +536,14 @@ public class Environment {
 
     public void setThiz(Value thiz) {
         this.thiz = thiz;
+    }
+
+    private static String substract(String value1, String value2) throws Exception {
+        if (String.valueOf(value1).contains(String.valueOf(value2))) {
+            return String.valueOf(value1).substring(0, String.valueOf(value1).lastIndexOf(String.valueOf(value2))) +
+                    String.valueOf(value1).substring(String.valueOf(value1).lastIndexOf(String.valueOf(value2)) + String.valueOf(value2).length());
+        }else{
+            throw new Exception("Dima pidor");
+        }
     }
 }

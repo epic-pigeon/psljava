@@ -7,6 +7,7 @@ import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class Evaluator {
     public static HashMap<String, Value> EXPORTS = new HashMap<>();
@@ -91,7 +92,7 @@ public class Evaluator {
                     return new SettableValue(Value.NULL) {
                         @Override
                         public Value set(Value value) {
-                            return environment.setVariable(((VariableNode) node).getValue(), value).getValue();
+                            return environment.defVariable(((VariableNode) node).getValue(), value).getValue();
                         }
 
                         @Override
@@ -293,33 +294,117 @@ public class Evaluator {
             case "index":
                 IndexNode indexNode = (IndexNode) node;
                 Value value = Evaluator.evaluate(indexNode.getValue(), environment);
-                if (value.getValue().getClass() == Collection.class) {
+                if (value.getValue() instanceof Collection) {
                     Collection<Value> arr = (Collection<Value>) value.getValue();
                     if (indexNode.isRange()) {
                         Value start = Evaluator.evaluate(indexNode.getBegin(), environment);
-                        if (start.getValue().getClass() == Double.class) {
-                            int begin = ((Double) start.getValue()).intValue();
+                        if (start.getValue() instanceof Number) {
+                            int begin = ((Number) start.getValue()).intValue();
                             if (indexNode.getEnd() == null) {
                                 return new Value(arr.slice(begin));
                             } else {
                                 Value finish = Evaluator.evaluate(indexNode.getEnd(), environment);
-                                if (finish.getValue().getClass() == Double.class) {
-                                    int end = ((Double) finish.getValue()).intValue();
+                                if (finish.getValue() instanceof Number) {
+                                    int end = ((Number) finish.getValue()).intValue();
+                                    if (end < 0) end += arr.size() - 1;
                                     return new Value(arr.slice(begin, end));
-                                }
+                                } else throw new Exception("Index value should be an integer");
                             }
                         } else {
                             throw new Exception("Index value should be an integer");
                         }
                     } else {
                         Value index = Evaluator.evaluate(indexNode.getBegin(), environment);
-                        if (index.getValue().getClass() == Double.class) {
-                            return arr.get(((Double) index.getValue()).intValue());
+                        if (index.getValue() instanceof Number) {
+                            return arr.get(((Number) index.getValue()).intValue());
+                        } else {
+                            throw new Exception("Index value should be an integer");
+                        }
+                    }
+                } else if (value.getValue() instanceof String) {
+                    String string = (String) value.getValue();
+                    if (indexNode.isRange()) {
+                        Value start = Evaluator.evaluate(indexNode.getBegin(), environment);
+                        if (start.getValue() instanceof Number) {
+                            int begin = ((Number) start.getValue()).intValue();
+                            if (indexNode.getEnd() == null) {
+                                return new Value(string.substring(begin));
+                            } else {
+                                Value finish = Evaluator.evaluate(indexNode.getEnd(), environment);
+                                if (finish.getValue() instanceof Number) {
+                                    int end = ((Number) finish.getValue()).intValue();
+                                    if (end < 0) end += string.length() - 1;
+                                    return new Value(string.substring(begin, end + 1));
+                                } else throw new Exception("Index value should be an integer");
+                            }
+                        } else {
+                            throw new Exception("Index value should be an integer");
+                        }
+                    } else {
+                        Value index = Evaluator.evaluate(indexNode.getBegin(), environment);
+                        if (index.getValue() instanceof Number) {
+                            return new Value(String.valueOf(string.charAt(((Number) index.getValue()).intValue())));
                         } else {
                             throw new Exception("Index value should be an integer");
                         }
                     }
                 } else throw new Exception("Bad value for index");
+            case "while":
+                WhileNode whileNode = (WhileNode) node;
+                Collection<Value> arr = new Collection<>();
+                while (toBoolean(Evaluator.evaluate(whileNode.getCondition(), environment))) {
+                    arr.add(Evaluator.evaluate(whileNode.getBody(), environment));
+                }
+                return new Value(arr);
+            case "for":
+                ForNode forNode = (ForNode) node;
+                Collection<Value> kar = (Collection<Value>) Evaluator.evaluate(forNode.getCollection(), environment).getValue();
+                Collection<Value> res = new Collection<>();
+                for (Value k: kar) {
+                    Environment scope = environment.extend();
+                    scope.defVariable(forNode.getName(), k);
+                    res.add(Evaluator.evaluate(forNode.getBody(), scope));
+                }
+                return new Value(res);
+            case "when":
+                WhenNode whenNode = (WhenNode)node;
+                for (int j = 0; j < whenNode.getConditions().size(); j++) {
+                    if (toBoolean(Evaluator.evaluate(whenNode.getConditions().get(j) , environment))){
+                        return Evaluator.evaluate(whenNode.getBodies().get(j) , environment);
+                    }
+                }
+                return whenNode.getOtherwise() == null ? Value.NULL : Evaluator.evaluate(whenNode.getOtherwise(), environment);
+            case "unary":
+                UnaryNode unaryNode = (UnaryNode) node;
+                return environment.getUnaryOperator(unaryNode.getOperator())
+                        .getAction().apply(unaryNode.getValue(), environment);
+            case "operator":
+                OperatorNode operatorNode  = (OperatorNode) node;
+                PSLFunction function = (PSLFunction) Evaluator.evaluate(operatorNode.getFunction(), environment).getValue();
+                if (operatorNode.isBinary()) {
+                    environment.defBinaryOperator(
+                            operatorNode.getOperator(),
+                            new BinaryOperator(
+                                    (node1, node2, env) -> function.apply(new Collection<>(
+                                                    Evaluator.evaluate(node1, env),
+                                                    Evaluator.evaluate(node2, env)
+                                            )),
+                                    operatorNode.getPrecedence() == null ? 15 : ((Number)Evaluator.evaluate(operatorNode.getPrecedence(), environment).getValue()).intValue()
+                            )
+                    );
+                } else {
+                    environment.defUnaryOperator(
+                            operatorNode.getOperator(),
+                            new UnaryOperator(
+                                    (node1, env) -> function.apply(new Collection<>(
+                                                    Evaluator.evaluate(node1, env)
+                                            ))
+                                    )
+                    );
+                }
+                return Value.NULL;
+            case "expand":
+                return new Value((Collection<Value>) Evaluator.evaluate(((ExpandNode) node).getNode(), environment).getValue());
             default: throw new Exception("Don't know how to evaluate " + node.getType());
         }
     }
@@ -332,6 +417,18 @@ public class Evaluator {
                 Collection<ParameterNode> parameters = node.getParameters();
                 for (int i = 0; i < parameters.size(); i++) {
                     ParameterNode parameter = parameters.get(i);
+                    if (parameter.isExpanded()) {
+                        Collection<Value> values;
+                        try {
+                            values = new Collection<>(
+                                    arguments.subList(i, arguments.size())
+                            );
+                        } catch (IllegalArgumentException | ArrayIndexOutOfBoundsException e) {
+                            values = new Collection<>();
+                        }
+                        scope.defVariable(parameter.getName(), new Value(values));
+                        break;
+                    }
                     Value argument1;
                     try {
                         argument1 = arguments.get(i);
@@ -362,14 +459,16 @@ public class Evaluator {
         Value functionValue = Evaluator.evaluate(((CallNode) node).getFunction(), environment);
         PSLFunction function = (PSLFunction) (functionValue.getValue());
         if (function == null) throw new Exception("Undefined function: " + ((CallNode) node).getFunction());
-        Collection<Value> arguments = ((CallNode) node).getArguments().map(node1 -> {
-            try {
-                return Evaluator.evaluate(node1, environment);
-            } catch (Exception e) {
-                e.printStackTrace();
-                return null;
+
+        Collection<Value> arguments = new Collection<>();
+        for (Node node1 : ((CallNode) node).getArguments()) {
+            Value val = Evaluator.evaluate(node1, environment);
+            if (node1 instanceof ExpandNode) {
+                arguments.addAll((Collection<Value>) val.getValue());
+            } else {
+                arguments.add(val);
             }
-        });
+        }
         return function.apply(arguments);
     }
     private static Exception croak(String reason) {
@@ -377,15 +476,25 @@ public class Evaluator {
         throwable.printStackTrace();
         return throwable;
     }
-    private static boolean toBoolean(Value value) {
+    public static boolean toBoolean(Value value) {
         Object val = value.getValue();
-        if (val.getClass() == String.class) {
-            return ((String) val).length() > 0;
-        } else if (val.getClass() == Double.class) {
-            return ((Double) val) != 0;
-        } else if (val.getClass() == Boolean.class) {
-            return (Boolean) val;
-        } else return value != null;
+        if (val != null) {
+            if (val.getClass() == String.class) {
+                return ((String) val).length() > 0;
+            } else if (val instanceof Number) {
+                return ((Number) val).doubleValue() != 0;
+            } else if (val.getClass() == Boolean.class) {
+                return (Boolean) val;
+            } else return true;
+        } else {
+            return !value.properties.isEmpty();
+        }
+    }
+    public static boolean equals(Value value1, Value value2, boolean strict) throws Exception {
+        try{
+            return value1.equals(value2, strict);
+        }catch (Throwable e){
+            throw new Exception("Ahuet");
+        }
     }
 }
-
