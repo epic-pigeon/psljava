@@ -7,8 +7,8 @@ import java.util.Map;
 
 public class PSLClass extends Value {
     private Environment scope;
-    private HashMap<String, ClassFieldNode> prototype;
-    private HashMap<String, PSLClassField> statics;
+    private HashMap<String, ClassFieldNode> prototype = new HashMap<>();
+    private HashMap<String, PSLClassField> statics = new HashMap<>();
     public PSLClass(Environment environment) {
         super(null);
         scope = environment.extend();
@@ -16,7 +16,7 @@ public class PSLClass extends Value {
 
     @Override
     public Value get(String key) throws Exception {
-        return statics.get(key).get(this, scope);
+        return statics.get(key) == null ? Value.NULL : statics.get(key).get(this, scope);
     }
 
     @Override

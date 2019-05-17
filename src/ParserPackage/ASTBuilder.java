@@ -171,13 +171,13 @@ public class ASTBuilder {
         skipToken("IMPORT");
         ImportNode node = new ImportNode();
         if (checkAndSkip("EVERYTHING") == null) {
-            Collection<Map.Entry<String, String>> collection = parseImports();
-            for (Map.Entry<String, String> entry: collection) {
+            for (Map.Entry<String, String> entry : parseImports()) {
                 node.put(entry.getKey(), entry.getValue());
             }
         }
         skipToken("FROM");
         node.setBuilt(checkAndSkip("BUILT") != null);
+        node.setNative(checkAndSkip("NATIVE") != null);
         node.setFilename(parseExpression());
         if (resolveImport) {
             if (node.getFilename().getType().equals("value")) {

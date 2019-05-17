@@ -3,11 +3,16 @@ package ParserPackage;
 import ParserPackage.ASTNodes.*;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Array;
 import java.lang.reflect.Field;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.net.URL;
+import java.net.URLClassLoader;
+import java.util.*;
 
 public class Evaluator {
     public static HashMap<String, Value> EXPORTS = new HashMap<>();
@@ -179,15 +184,68 @@ public class Evaluator {
                 };
             case "import":
                 ImportNode importNode = (ImportNode) node;
-                Value exports = null;
+                Value exports;
                 String filename = Evaluator.evaluate(importNode.getFilename(), environment).getValue().toString();
-                if (!(new File(filename + ".build").exists() || importNode.isBuilt())) {
+                File file = new File(filename);
+                if (new File(filename + ".build").exists() || importNode.isBuilt()) {
+                    exports = Parser.run(filename + (importNode.isBuilt() ? "" : ".build"));
+                } else if (importNode.isNative()) {
+                    URL url = file.getParentFile().toURI().toURL();
+                    URL[] urls = new URL[]{url};
+
+                    ClassLoader cl = new URLClassLoader(urls);
+
+                    Class clazz = cl.loadClass(file.getName());
+                    PSLClass cls = new PSLClass(environment);
+
+                    for (Method method: clazz.getDeclaredMethods()) {
+                        if (Modifier.isStatic(method.getModifiers())) {
+                            method.setAccessible(true);
+                            PSLClassField classField = new PSLClassField();
+                            classField.setDefaultValue(methodToValue(method));
+                            AccessModifiers accessModifier = Modifier.isPublic   (method.getModifiers()) ? AccessModifiers.PUBLIC
+                                                            :Modifier.isProtected(method.getModifiers()) ? AccessModifiers.PROTECTED
+                                                            :Modifier.isPrivate  (method.getModifiers()) ? AccessModifiers.PRIVATE
+                                                            :                                              AccessModifiers.DISABLED;
+                            classField.setGetModifier(accessModifier);
+                            classField.setSetModifier(accessModifier);
+
+                            cls.getStatics().put(method.getName(), classField);
+                        }
+                    }
+
+                    for (Field field: clazz.getDeclaredFields()) {
+                        if (Modifier.isStatic(field.getModifiers()) && !field.getName().equals("__NAME__")) {
+                            field.setAccessible(true);
+                            PSLClassField classField = new PSLClassField();
+                            classField.setDefaultValue(objectToValue(field.get(null)));
+                            AccessModifiers accessModifier =
+                                     Modifier.isPublic   (field.getModifiers()) ? AccessModifiers.PUBLIC
+                                    :Modifier.isProtected(field.getModifiers()) ? AccessModifiers.PROTECTED
+                                    :Modifier.isPrivate  (field.getModifiers()) ? AccessModifiers.PRIVATE
+                                    :                                             AccessModifiers.DISABLED;
+                            classField.setGetModifier(accessModifier);
+                            classField.setSetModifier(accessModifier);
+
+                            cls.getStatics().put(field.getName(), classField);
+                        }
+                    }
+
+                    exports = new Value();
+                    String className;
+                    try {
+                        Field field = clazz.getDeclaredField("__NAME__");
+                        field.setAccessible(true);
+                        className = (String) field.get(null);
+                    } catch (Exception e) {
+                        className = clazz.getName();
+                    }
+                    exports.put(className, cls);
+                } else {
                     Value filenameValue = Evaluator.evaluate(importNode.getFilename(), environment);
                     if (String.class.isAssignableFrom(filenameValue.getValue().getClass())) {
                         exports = Parser.interpret(filename, environment);
                     } else throw new Exception("String expected after FROM");
-                } else {
-                    exports = Parser.run(filename + (importNode.isBuilt() ? "" : ".build"));
                 }
                 if (!importNode.isEmpty()) for (Map.Entry<String, String> entry: importNode.entrySet()) {
                     if (exports.get(entry.getKey()) != null) {
@@ -496,5 +554,54 @@ public class Evaluator {
         }catch (Throwable e){
             throw new Exception("Ahuet");
         }
+    }
+    private static Value objectToValue(Object value) throws Exception {
+        if (value == null || value instanceof String || getWrapperTypes().contains(value.getClass())) {
+            return new Value(value);
+        } else if (value.getClass().isAnnotationPresent(FunctionalInterface.class)) {
+            return methodToValue(value.getClass().getDeclaredMethods()[0], value);
+        } else {
+            Value result = new Value(value);
+            for (Method method: value.getClass().getDeclaredMethods()) {
+                if (!Modifier.isStatic(method.getModifiers())) {
+                    method.setAccessible(true);
+                    result.put(method.getName(), methodToValue(method));
+                }
+            }
+            for (Field field: value.getClass().getDeclaredFields()) {
+                if (!Modifier.isStatic(field.getModifiers())) {
+                    field.setAccessible(true);
+                    result.put(field.getName(), objectToValue(field.get(value)));
+                }
+            }
+            return result;
+        }
+    }
+    private static Value methodToValue(Method method, Object thiz) {
+        return new Value(
+                new PSLFunction() {
+                    @Override
+                    public Value apply(Collection<Value> t) throws Exception {
+                        Object result = method.invoke(thiz, t.map(Value::getValue).toArray());
+                        return objectToValue(result);
+                    }
+                }
+        );
+    }
+    private static Value methodToValue(Method method) {
+        return methodToValue(method, null);
+    }
+    private static Set<Class<?>> getWrapperTypes() {
+        Set<Class<?>> result = new HashSet<>();
+        result.add(Boolean  .class);
+        result.add(Character.class);
+        result.add(Byte     .class);
+        result.add(Short    .class);
+        result.add(Integer  .class);
+        result.add(Long     .class);
+        result.add(Float    .class);
+        result.add(Double   .class);
+        result.add(Void     .class);
+        return result;
     }
 }

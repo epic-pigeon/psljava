@@ -30,6 +30,7 @@ public class Parser {
             new Rule("SEMICOLON", Pattern.compile(";")),
             new Rule("FUNCTION", Pattern.compile("function")),
             new Rule("WHEN", Pattern.compile("when")),
+            new Rule("NATIVE", Pattern.compile("native")),
             new Rule("EXPAND", Pattern.compile("\\.\\.\\.")),
             new Rule("COLON", Pattern.compile(":")),
             new Rule("EXPORT", Pattern.compile("export")),

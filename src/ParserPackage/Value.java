@@ -6,6 +6,7 @@ import java.util.*;
 public class Value //extends JSONToString
     implements Serializable
 {
+    private static final long serialVersionUID = 13987458314534165L;
     public boolean isSettable() {
         return false;
     }

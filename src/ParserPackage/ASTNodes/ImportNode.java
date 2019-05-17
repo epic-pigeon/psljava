@@ -12,6 +12,15 @@ public class ImportNode extends Node {
     private HashMap<String, String> imports = new HashMap<>();
     private Node filename;
     private boolean built;
+    private boolean native1;
+
+    public boolean isNative() {
+        return native1;
+    }
+
+    public void setNative(boolean native1) {
+        this.native1 = native1;
+    }
 
     public boolean isBuilt() {
         return built;
