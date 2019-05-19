@@ -213,10 +213,10 @@ public class Environment {
                         if (value2 instanceof Number) {
                             result = new Value(((Number) value1).doubleValue() - ((Number) value2).doubleValue());
                         } else {
-                            result = new Value(substract(String.valueOf(value1), String.valueOf(value2)));
+                            result = new Value(subtract(String.valueOf(value1), String.valueOf(value2)));
                         }
                     } else {
-                        result = new Value(substract(String.valueOf(value1), String.valueOf(value2)));
+                        result = new Value(subtract(String.valueOf(value1), String.valueOf(value2)));
                     }
                     for (Map.Entry<String, Value> entry : v1.properties.entrySet()) {
                         if (!v2.properties.containsKey(entry.getKey())) {
@@ -318,8 +318,7 @@ public class Environment {
                     if (value2.isSettable()) {
                         Value val = value2.get(prop);
                         if (val == null) {
-                            value2.put(prop, Value.NULL);
-                            val = Value.NULL;
+                            throw new NullPointerException();
                         }
                         return new SettableValue(val) {
                             @Override
@@ -538,7 +537,7 @@ public class Environment {
         this.thiz = thiz;
     }
 
-    private static String substract(String value1, String value2) throws Exception {
+    private static String subtract(String value1, String value2) throws Exception {
         if (String.valueOf(value1).contains(String.valueOf(value2))) {
             return String.valueOf(value1).substring(0, String.valueOf(value1).lastIndexOf(String.valueOf(value2))) +
                     String.valueOf(value1).substring(String.valueOf(value1).lastIndexOf(String.valueOf(value2)) + String.valueOf(value2).length());

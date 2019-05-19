@@ -6,26 +6,20 @@ public class PSLClassField extends Value {
     }
     private Value value;
     private PSLFunction onGet;
-    private AccessModifiers getModifier;
     private PSLFunction onSet;
-    private AccessModifiers setModifier;
     public Value get(Value clazz, Environment scope) throws Exception {
-        if (getModifier == AccessModifiers.PUBLIC) {
             if (onGet == null) {
                 return value;
             } else {
                 return onGet.apply(new Collection<>());
             }
-        } else throw new Exception("Getting is " + getModifier);
     }
     public Value set(Value clazz, Value val, Environment scope) throws Exception {
-        if (setModifier == AccessModifiers.PUBLIC) {
             if (onSet == null) {
                 return value = val;
             } else {
                 return onSet.apply(new Collection<>(val));
             }
-        } else throw new Exception("Setting is " + setModifier);
     }
 
     @Override
@@ -54,27 +48,11 @@ public class PSLClassField extends Value {
         this.onGet = onGet;
     }
 
-    public AccessModifiers getGetModifier() {
-        return getModifier;
-    }
-
-    public void setGetModifier(AccessModifiers getModifier) {
-        this.getModifier = getModifier;
-    }
-
     public PSLFunction getOnSet() {
         return onSet;
     }
 
     public void setOnSet(PSLFunction onSet) {
         this.onSet = onSet;
-    }
-
-    public AccessModifiers getSetModifier() {
-        return setModifier;
-    }
-
-    public void setSetModifier(AccessModifiers setModifier) {
-        this.setModifier = setModifier;
     }
 }

@@ -115,7 +115,7 @@ public class Value //extends JSONToString
         if (!strict) {
             return String.valueOf(obj1).equals(String.valueOf(obj2));
         } else {
-            return Objects.equals(obj1, obj2) && obj1.getClass() == obj2.getClass();
+            return Objects.equals(obj1, obj2); //&& obj1.getClass() == obj2.getClass();
         }
     }
 }

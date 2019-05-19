@@ -7,4 +7,14 @@ public class PSLNativeLib {
     public static void sayKar() {
         System.out.println("kar");
     }
+    private static class Kar {
+        static String kar = "ne kar";
+    }
+    public static Integer sum(Integer i1, Integer i2) {
+        return i1 + i2;
+    }
+    public PSLNativeLib() {
+        System.out.println("kar");
+    }
+    public int kar = 1;
 }

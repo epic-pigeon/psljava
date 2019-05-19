@@ -395,6 +395,8 @@ public class ASTBuilder {
                     return parseUnary();
                 } else if (checkToken("BINARY") || checkToken("UNARY")) {
                     return parseOperator();
+                } else if (checkToken("SWITCH")) {
+                    return parseSwitch();
                 } else throw new Exception("Unexpected token " + tokenHolder.lookUp());
             } catch (Exception e) {
                 e.printStackTrace();
@@ -492,11 +494,40 @@ public class ASTBuilder {
         classNode.setFields(map);
         return classNode;
     }
+    private static SwitchNode parseSwitch() throws Exception {
+        SwitchNode switchNode = new SwitchNode();
+        skipToken("SWITCH");
+        skipToken("LEFT_PAREN");
+        switchNode.setValue(parseExpression());
+        skipToken("RIGHT_PAREN");
+        switchNode.setBranches(delimited("LEFT_CURLY_PAREN", null, "RIGHT_CURLY_PAREN", () -> {
+            try {
+                return parseSwitchBranch();
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
+            }
+        }));
+        return switchNode;
+    }
+    private static SwitchBranchNode parseSwitchBranch() throws Exception {
+        SwitchBranchNode switchBranchNode = new SwitchBranchNode();
+        Collection<Node> values = new Collection<>();
+        while (checkToken("CASE") || checkToken("DEFAULT")) {
+            if (checkAndSkip("CASE") != null) {
+                values.add(parseExpression());
+                skipToken("COLON");
+            } else if (checkAndSkip("DEFAULT") != null) {
+                values.add(null);
+                skipToken("COLON");
+            } else throw new Exception("wtf");
+        }
+        switchBranchNode.setValues(values);
+        switchBranchNode.setThen(checkToken("LEFT_CURLY_BRACE") ? parseBody() : parseExpression());
+        return switchBranchNode;
+    }
     private static Map.Entry<String, ClassFieldNode> parseClassField() throws Exception {
         ClassFieldNode classFieldNode = new ClassFieldNode();
-        if (checkToken("ACCESS_MODIFIER")) {
-            classFieldNode.setGetModifier(AccessModifiers.forName(skipToken("ACCESS_MODIFIER").getValue()));
-        }
 
         classFieldNode.setStatic(checkAndSkip("STATIC") != null);
 
@@ -510,20 +541,15 @@ public class ASTBuilder {
         }
 
         while (true) {
-            if (checkToken("ACCESS_MODIFIER")) {
-                Token token = skipToken("ACCESS_MODIFIER");
                 if (checkAndSkip("GET") != null) {
-                    classFieldNode.setGetModifier(AccessModifiers.forName(token.getValue()));
                     if (checkToken("LEFT_CURLY_PAREN")) {
                         classFieldNode.setGetAction(parseBody(true));
                     }
                 } else if (checkAndSkip("SET") != null) {
-                    classFieldNode.setSetModifier(AccessModifiers.forName(token.getValue()));
                     if (checkToken("LEFT_CURLY_PAREN")) {
                         classFieldNode.setSetAction(parseBody(true));
                     }
-                } else throw new Exception("Expected get or set, got " + tokenHolder.lookUp().getName());
-            } else break;
+                } else break;
         }
 
         return new Map.Entry<String, ClassFieldNode>() {

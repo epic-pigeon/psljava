@@ -6,10 +6,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.lang.reflect.Array;
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
+import java.lang.reflect.*;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.*;
@@ -196,40 +193,8 @@ public class Evaluator {
                     ClassLoader cl = new URLClassLoader(urls);
 
                     Class clazz = cl.loadClass(file.getName());
-                    PSLClass cls = new PSLClass(environment);
 
-                    for (Method method: clazz.getDeclaredMethods()) {
-                        if (Modifier.isStatic(method.getModifiers())) {
-                            method.setAccessible(true);
-                            PSLClassField classField = new PSLClassField();
-                            classField.setDefaultValue(methodToValue(method));
-                            AccessModifiers accessModifier = Modifier.isPublic   (method.getModifiers()) ? AccessModifiers.PUBLIC
-                                                            :Modifier.isProtected(method.getModifiers()) ? AccessModifiers.PROTECTED
-                                                            :Modifier.isPrivate  (method.getModifiers()) ? AccessModifiers.PRIVATE
-                                                            :                                              AccessModifiers.DISABLED;
-                            classField.setGetModifier(accessModifier);
-                            classField.setSetModifier(accessModifier);
-
-                            cls.getStatics().put(method.getName(), classField);
-                        }
-                    }
-
-                    for (Field field: clazz.getDeclaredFields()) {
-                        if (Modifier.isStatic(field.getModifiers()) && !field.getName().equals("__NAME__")) {
-                            field.setAccessible(true);
-                            PSLClassField classField = new PSLClassField();
-                            classField.setDefaultValue(objectToValue(field.get(null)));
-                            AccessModifiers accessModifier =
-                                     Modifier.isPublic   (field.getModifiers()) ? AccessModifiers.PUBLIC
-                                    :Modifier.isProtected(field.getModifiers()) ? AccessModifiers.PROTECTED
-                                    :Modifier.isPrivate  (field.getModifiers()) ? AccessModifiers.PRIVATE
-                                    :                                             AccessModifiers.DISABLED;
-                            classField.setGetModifier(accessModifier);
-                            classField.setSetModifier(accessModifier);
-
-                            cls.getStatics().put(field.getName(), classField);
-                        }
-                    }
+                    PSLClass cls = buildClass(clazz, environment);
 
                     exports = new Value();
                     String className;
@@ -329,8 +294,6 @@ public class Evaluator {
                     functionNode.setParameters(new Collection<>(parameterNode0, parameterNode1));
                     pslClassField.setOnSet((PSLFunction) Evaluator.evaluate(functionNode, environment).getValue());
                 }
-                pslClassField.setGetModifier(classFieldNode.getGetModifier());
-                pslClassField.setSetModifier(classFieldNode.getSetModifier());
                 if (classFieldNode.getValue() != null)
                     pslClassField.setDefaultValue(Evaluator.evaluate(classFieldNode.getValue(), environment));
                 return pslClassField;
@@ -463,6 +426,17 @@ public class Evaluator {
                 return Value.NULL;
             case "expand":
                 return new Value((Collection<Value>) Evaluator.evaluate(((ExpandNode) node).getNode(), environment).getValue());
+            case "switch":
+                SwitchNode switchNode = (SwitchNode) node;
+                Value switched = Evaluator.evaluate(switchNode.getValue(), environment);
+                for (SwitchBranchNode switchBranchNode: switchNode.getBranches()) {
+                    for (Node caseValue: switchBranchNode.getValues()) {
+                        if (caseValue == null || equals(switched, evaluate(caseValue, environment), true)) {
+                            return evaluate(switchBranchNode.getThen(), environment);
+                        }
+                    }
+                }
+                return Value.NULL;
             default: throw new Exception("Don't know how to evaluate " + node.getType());
         }
     }
@@ -555,41 +529,46 @@ public class Evaluator {
             throw new Exception("Ahuet");
         }
     }
-    private static Value objectToValue(Object value) throws Exception {
+    private static Value objectToValue(Object value, Environment environment) throws Exception {
         if (value == null || value instanceof String || getWrapperTypes().contains(value.getClass())) {
             return new Value(value);
         } else if (value.getClass().isAnnotationPresent(FunctionalInterface.class)) {
-            return methodToValue(value.getClass().getDeclaredMethods()[0], value);
+            return methodToValue(value.getClass().getDeclaredMethods()[0], value, environment);
         } else {
             Value result = new Value(value);
             for (Method method: value.getClass().getDeclaredMethods()) {
                 if (!Modifier.isStatic(method.getModifiers())) {
                     method.setAccessible(true);
-                    result.put(method.getName(), methodToValue(method));
+                    result.put(method.getName(), methodToValue(method, environment));
                 }
             }
             for (Field field: value.getClass().getDeclaredFields()) {
                 if (!Modifier.isStatic(field.getModifiers())) {
                     field.setAccessible(true);
-                    result.put(field.getName(), objectToValue(field.get(value)));
+                    result.put(field.getName(), objectToValue(field.get(value), environment));
+                }
+            }
+            for (Class clazz: value.getClass().getDeclaredClasses()) {
+                if (!Modifier.isStatic(clazz.getModifiers())) {
+                    result.put(clazz.getName(), buildClass(clazz, environment));
                 }
             }
             return result;
         }
     }
-    private static Value methodToValue(Method method, Object thiz) {
+    private static Value methodToValue(Method method, Object thiz, Environment environment) {
         return new Value(
                 new PSLFunction() {
                     @Override
                     public Value apply(Collection<Value> t) throws Exception {
                         Object result = method.invoke(thiz, t.map(Value::getValue).toArray());
-                        return objectToValue(result);
+                        return objectToValue(result, environment);
                     }
                 }
         );
     }
-    private static Value methodToValue(Method method) {
-        return methodToValue(method, null);
+    private static Value methodToValue(Method method, Environment environment) {
+        return methodToValue(method, null, environment);
     }
     private static Set<Class<?>> getWrapperTypes() {
         Set<Class<?>> result = new HashSet<>();
@@ -603,5 +582,73 @@ public class Evaluator {
         result.add(Double   .class);
         result.add(Void     .class);
         return result;
+    }
+    private static PSLClass buildClass(Class clazz, Environment environment) throws Exception {
+        PSLClass cls = new PSLClass(environment);
+
+        for (Method method: clazz.getDeclaredMethods()) {
+            method.setAccessible(true);
+            if (Modifier.isStatic(method.getModifiers())) {
+                method.setAccessible(true);
+                PSLClassField classField = new PSLClassField();
+                classField.setDefaultValue(methodToValue(method, environment));
+                cls.getStatics().put(method.getName(), classField);
+            } else {
+                ClassFieldNode classFieldNode = new ClassFieldNode();
+                classFieldNode.setValue(new ValueNode(methodToValue(method, environment)));
+
+                cls.getPrototype().put(method.getName(), classFieldNode);
+            }
+        }
+
+        for (Field field: clazz.getDeclaredFields()) {
+            field.setAccessible(true);
+            if (Modifier.isStatic(field.getModifiers()) && !field.getName().equals("__NAME__")) {
+                field.setAccessible(true);
+                PSLClassField classField = new PSLClassField();
+                classField.setDefaultValue(objectToValue(field.get(null), environment));
+
+                cls.getStatics().put(field.getName(), classField);
+            } else {
+                ClassFieldNode classFieldNode = new ClassFieldNode();
+                classFieldNode.setValue(new ValueNode(objectToValue(field.get(null), environment)));
+
+                cls.getPrototype().put(field.getName(), classFieldNode);
+            }
+        }
+
+        for (Class clas: clazz.getDeclaredClasses()) {
+            if (Modifier.isStatic(clas.getModifiers())) {
+                PSLClassField classField = new PSLClassField();
+                classField.setDefaultValue(buildClass(clas, environment));
+
+                cls.getStatics().put(clas.getSimpleName(), classField);
+            } else {
+                ClassFieldNode classFieldNode = new ClassFieldNode();
+                classFieldNode.setValue(new ValueNode(buildClass(clas, environment)));
+
+                cls.getPrototype().put(clas.getSimpleName(), classFieldNode);
+            }
+        }
+
+        ClassFieldNode constructorNode = new ClassFieldNode();
+        Value result = new Value(null);
+        constructorNode.setValue(new ValueNode(
+                new Value(
+                        new PSLFunction() {
+                            @Override
+                            public Value apply(Collection<Value> t) throws Exception {
+                                Constructor constructor = clazz.getConstructor(t.map(e -> e.getValue().getClass()).toArray(new Class[] {}));
+                                Value instance = objectToValue(constructor.newInstance(t.map(Value::getValue).toArray()), environment);
+                                result.setValue(instance.getValue());
+                                result.setProperties(instance.getProperties());
+                                return Value.NULL;
+                            }
+                        }
+                )
+        ));
+        cls.getPrototype().put("constructor", constructorNode);
+
+        return cls;
     }
 }

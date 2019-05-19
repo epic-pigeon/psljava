@@ -44,8 +44,11 @@ public class Parser {
             new Rule("IMPORT", Pattern.compile("import")),
             new Rule("BUILT", Pattern.compile("built")),
             new Rule("CLASS", Pattern.compile("class")),
+            new Rule("DEFAULT", Pattern.compile("default")),
             new Rule("GET", Pattern.compile("get")),
             new Rule("INITIALIZER", Pattern.compile("initializer")),
+            new Rule("SWITCH", Pattern.compile("switch")),
+            new Rule("CASE", Pattern.compile("case")),
             new Rule("SET", Pattern.compile("set")),
             new Rule("OVERRIDE", Pattern.compile("override")),
             new Rule("PRECEDENCE", Pattern.compile("precedence")),
@@ -59,11 +62,6 @@ public class Parser {
             new Rule("MULTILINE_COMMENT", Pattern.compile("/\\*([^/])*\\*/"))
     );
     static {
-        Rule rule = new Rule("ACCESS_MODIFIER", new Collection<>());
-        for (AccessModifiers accessModifier: AccessModifiers.values()) {
-            rule.addPattern(Pattern.compile(accessModifier.getName()));
-        }
-        rules.add(rule);
         rules.add(new Rule("IDENTIFIER", Pattern.compile("[a-zA-Z$_][a-zA-Z&_0-9]*")));
     }
     private static Rule toSkip = new Rule("kar", Pattern.compile("\\s+"));
