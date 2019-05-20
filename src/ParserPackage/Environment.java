@@ -317,9 +317,6 @@ public class Environment {
                     }
                     if (value2.isSettable()) {
                         Value val = value2.get(prop);
-                        if (val == null) {
-                            throw new NullPointerException();
-                        }
                         return new SettableValue(val) {
                             @Override
                             public Value set(Value value1) throws Exception {
@@ -461,7 +458,67 @@ public class Environment {
         }
         DEFAULT_ENVIRONMENT.defVariable("system", system);
         DEFAULT_ENVIRONMENT.defVariable("fs", fs);
-        DEFAULT_ENVIRONMENT.defVariable("null", Value.NULL);
+        DEFAULT_ENVIRONMENT.defVariable("null", new Value() {
+            @Override
+            public boolean isSettable() {
+                return false;
+            }
+
+            @Override
+            public HashMap<String, Value> getProperties() {
+                return new HashMap<>();
+            }
+
+            @Override
+            public void setProperties(HashMap<String, Value> properties) {
+
+            }
+
+            @Override
+            public Value get(String key) throws Exception {
+                return Value.NULL;
+            }
+
+            @Override
+            public Value put(String key, Value value) throws Exception {
+                return Value.NULL;
+            }
+
+            @Override
+            public Object getValue() {
+                return null;
+            }
+
+            @Override
+            public void setValue(Object value) {
+
+            }
+
+            @Override
+            public String stringifyProps() {
+                return "{}";
+            }
+
+            @Override
+            public String toString() {
+                return "null";
+            }
+
+            @Override
+            public void putAll(Map<? extends String, ? extends Value> m) {
+
+            }
+
+            @Override
+            public boolean equals(Object obj) {
+                return super.equals(obj);
+            }
+
+            @Override
+            public boolean equals(Object obj, boolean strict) {
+                return super.equals(obj, strict);
+            }
+        });
         DEFAULT_ENVIRONMENT.defVariable("math", math);
         DEFAULT_ENVIRONMENT.defVariable("typeof", new Value(
                 new PSLFunction() {
