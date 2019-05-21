@@ -244,6 +244,19 @@ public class ASTBuilder {
             }
         });
     }
+    private TryNode parseTry() throws Exception {
+        TryNode tryNode = new TryNode();
+        skipToken("TRY");
+        tryNode.setToTry(checkToken("LEFT_CURLY_PAREN") ? parseBody() : parseExpression());
+        if (checkAndSkip("CATCH") != null) tryNode.setToCatch(parseFunction(false));
+        if (checkAndSkip("FINALLY") != null) tryNode.setElseFinally(checkToken("LEFT_CURLY_PAREN") ? parseBody() : parseExpression());
+
+        return tryNode;
+    }
+    private ThrowNode parseThrow() throws Exception {
+        skipToken("THROW");
+        return new ThrowNode(parseExpression());
+    }
     private ValueNode parseNumber() throws Exception {
         Token token = skipToken("NUMBER");
         return new ValueNode(
@@ -406,6 +419,10 @@ public class ASTBuilder {
                 } else if (checkToken("EXPAND")) {
                     skipToken("EXPAND");
                     return new ExpandNode(parseAtom());
+                } else if (checkToken("THROW")) {
+                    return parseThrow();
+                } else if (checkToken("TRY")) {
+                    return parseTry();
                 } else {
                     Token token = tokenHolder.lookUp();
                     if (token.getRule().getParse() != null) {

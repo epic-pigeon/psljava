@@ -440,6 +440,26 @@ public class Evaluator {
                 Value value1 = customNode.getValue();
                 Value parse = Evaluator.evaluate(customNode.getParse(), environment);
                 return ((PSLFunction) parse.getValue()).apply(new Collection<>(value1));
+            case "throw":
+                throw new PSLException(Evaluator.evaluate(((ThrowNode) node).getNode(), environment));
+            case "try":
+                TryNode tryNode = (TryNode) node;
+                Value ret = Value.NULL;
+                boolean changed = false;
+                try {
+                    ret = Evaluator.evaluate(tryNode.getToTry(), environment);
+                    changed = true;
+                } catch (PSLException e) {
+                    if (tryNode.getToCatch() != null) {
+                        ret = ((PSLFunction) Evaluator.evaluate(tryNode.getToCatch(), environment).getValue()).apply(new Collection<>(e.getValue()));
+                        changed = true;
+                    }
+                }
+                if (tryNode.getElseFinally() != null) {
+                    Value value2 = Evaluator.evaluate(tryNode.getElseFinally(), environment);
+                    if (!changed) ret = value2;
+                }
+                return ret;
             default: throw new Exception("Don't know how to evaluate " + node.getType());
         }
     }
