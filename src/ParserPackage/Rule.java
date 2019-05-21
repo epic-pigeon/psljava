@@ -1,10 +1,14 @@
 package ParserPackage;
 
+import ParserPackage.ASTNodes.Node;
+
 import java.util.regex.Pattern;
 
 public class Rule {
     private Collection<Pattern> patterns = new Collection<>();
     private String name;
+    private String parse;
+    private String runtimeParse;
 
     public Rule(String name, Pattern pattern) {
         this.patterns.add(pattern);
@@ -53,6 +57,26 @@ public class Rule {
 
     public void setPatterns(Collection<Pattern> patterns) {
         this.patterns = patterns;
+    }
+
+    public String getParse() {
+        return parse;
+    }
+
+    public void setParse(String parse) {
+        this.parse = parse;
+    }
+
+    public String getRuntimeParse() {
+        return runtimeParse;
+    }
+
+    public void setRuntimeParse(String runtimeParse) {
+        this.runtimeParse = runtimeParse;
+    }
+
+    public boolean isKeyword() {
+        return false;
     }
 
     @Override

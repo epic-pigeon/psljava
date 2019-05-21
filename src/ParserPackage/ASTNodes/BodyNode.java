@@ -1,5 +1,6 @@
 package ParserPackage.ASTNodes;
 
+import ParserPackage.ASTBuilder;
 import ParserPackage.Collection;
 
 public class BodyNode extends Node {

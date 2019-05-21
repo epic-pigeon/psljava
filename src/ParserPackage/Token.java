@@ -3,6 +3,7 @@ package ParserPackage;
 public class Token {
     private String name;
     private String value;
+    private Rule rule;
     private int position;
 
     public int getNewLines() {
@@ -15,9 +16,10 @@ public class Token {
 
     private int newLines;
 
-    public Token(String name, String value, int position, int newLines) {
+    public Token(String name, String value, Rule rule, int position, int newLines) {
         this.name = name;
         this.value = value;
+        this.rule = rule;
         this.position = position;
         this.newLines = newLines;
     }
@@ -48,5 +50,13 @@ public class Token {
 
     public String toString() {
         return name + " '" + value.replaceAll("\\r?\\n", "<new line>") + "' on " + position;
+    }
+
+    public Rule getRule() {
+        return rule;
+    }
+
+    public void setRule(Rule rule) {
+        this.rule = rule;
     }
 }

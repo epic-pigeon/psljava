@@ -1,8 +1,6 @@
 package ParserPackage;
 
-import ParserPackage.ASTNodes.Node;
-import ParserPackage.ASTNodes.ParentedNode;
-import ParserPackage.ASTNodes.ProgramNode;
+import ParserPackage.ASTNodes.*;
 import sun.awt.Symbol;
 
 import java.io.*;
@@ -28,43 +26,43 @@ public class Parser {
             new Rule("NUMBER", Pattern.compile("\\d+(\\.\\d+)?")),
             new Rule("STRING", Pattern.compile("('([^']|(\\\\.))*')|(\"([^\"]|(\\\\.))*\")")),
             new Rule("SEMICOLON", Pattern.compile(";")),
-            new Rule("FUNCTION", Pattern.compile("function")),
-            new Rule("WHEN", Pattern.compile("when")),
-            new Rule("NATIVE", Pattern.compile("native")),
+            new KeywordRule("FUNCTION", "function"),
+            new Rule("WHEN", Pattern.compile("when[^0-9A-Za-z_$]")),
+            new Rule("NATIVE", Pattern.compile("native[^0-9A-Za-z_$]")),
             new Rule("EXPAND", Pattern.compile("\\.\\.\\.")),
             new Rule("COLON", Pattern.compile(":")),
-            new Rule("EXPORT", Pattern.compile("export")),
-            new Rule("WHILE", Pattern.compile("while")),
-            new Rule("FOR", Pattern.compile("for")),
-            new Rule("IN", Pattern.compile("in")),
-            new Rule("AS", Pattern.compile("as")),
-            new Rule("NEW", Pattern.compile("new")),
-            new Rule("IF", Pattern.compile("if")),
-            new Rule("ELSE", Pattern.compile("else")),
-            new Rule("IMPORT", Pattern.compile("import")),
-            new Rule("BUILT", Pattern.compile("built")),
-            new Rule("CLASS", Pattern.compile("class")),
-            new Rule("DEFAULT", Pattern.compile("default")),
-            new Rule("GET", Pattern.compile("get")),
-            new Rule("INITIALIZER", Pattern.compile("initializer")),
-            new Rule("SWITCH", Pattern.compile("switch")),
-            new Rule("CASE", Pattern.compile("case")),
-            new Rule("SET", Pattern.compile("set")),
-            new Rule("OVERRIDE", Pattern.compile("override")),
-            new Rule("PRECEDENCE", Pattern.compile("precedence")),
-            new Rule("OPERATOR_KEYWORD", Pattern.compile("operator")),
-            new Rule("BINARY", Pattern.compile("binary")),
-            new Rule("UNARY", Pattern.compile("unary")),
-            new Rule("STATIC", Pattern.compile("static")),
-            new Rule("FROM", Pattern.compile("from")),
-            new Rule("EVERYTHING", Pattern.compile("everything")),
-            new Rule("RETURN", Pattern.compile("return")),
+            new Rule("EXPORT", Pattern.compile("export[^0-9A-Za-z_$]")),
+            new Rule("WHILE", Pattern.compile("while[^0-9A-Za-z_$]")),
+            new Rule("FOR", Pattern.compile("for[^0-9A-Za-z_$]")),
+            new Rule("IN", Pattern.compile("in[^0-9A-Za-z_$]")),
+            new Rule("AS", Pattern.compile("as[^0-9A-Za-z_$]")),
+            new Rule("NEW", Pattern.compile("new[^0-9A-Za-z_$]")),
+            new Rule("IF", Pattern.compile("if[^0-9A-Za-z_$]")),
+            new Rule("ELSE", Pattern.compile("else[^0-9A-Za-z_$]")),
+            new Rule("IMPORT", Pattern.compile("import[^0-9A-Za-z_$]")),
+            new Rule("BUILT", Pattern.compile("built[^0-9A-Za-z_$]")),
+            new Rule("CLASS", Pattern.compile("class[^0-9A-Za-z_$]")),
+            new Rule("DEFAULT", Pattern.compile("default[^0-9A-Za-z_$]")),
+            new Rule("GET", Pattern.compile("get[^0-9A-Za-z_$]")),
+            new Rule("INITIALIZER", Pattern.compile("initializer[^0-9A-Za-z_$]")),
+            new Rule("SWITCH", Pattern.compile("switch[^0-9A-Za-z_$]")),
+            new Rule("CASE", Pattern.compile("case[^0-9A-Za-z_$]")),
+            new Rule("SET", Pattern.compile("set[^0-9A-Za-z_$]")),
+            new Rule("OVERRIDE", Pattern.compile("override[^0-9A-Za-z_$]")),
+            new Rule("PRECEDENCE", Pattern.compile("precedence[^0-9A-Za-z_$]")),
+            new Rule("OPERATOR_KEYWORD", Pattern.compile("operator[^0-9A-Za-z_$]")),
+            new Rule("BINARY", Pattern.compile("binary[^0-9A-Za-z_$]")),
+            new Rule("UNARY", Pattern.compile("unary[^0-9A-Za-z_$]")),
+            new Rule("STATIC", Pattern.compile("static[^0-9A-Za-z_$]")),
+            new Rule("FROM", Pattern.compile("from[^0-9A-Za-z_$]")),
+            new Rule("EVERYTHING", Pattern.compile("everything[^0-9A-Za-z_$]")),
+            new Rule("RETURN", Pattern.compile("return[^0-9A-Za-z_$]")),
             new Rule("MULTILINE_COMMENT", Pattern.compile("/\\*([^/])*\\*/"))
     );
     static {
         rules.add(new Rule("IDENTIFIER", Pattern.compile("[a-zA-Z$_][a-zA-Z&_0-9]*")));
     }
-    private static Rule toSkip = new Rule("kar", Pattern.compile("\\s+"));
+    public static Rule toSkip = new Rule("kar", Pattern.compile("\\s+"));
     public static void compile(String filename) throws Exception {
         compile(filename, filename + ".build", Environment.DEFAULT_ENVIRONMENT);
     }
@@ -73,6 +71,29 @@ public class Parser {
     }
     public static void compile(String filename, String toFilename) throws Exception {
         compile(filename, toFilename, Environment.DEFAULT_ENVIRONMENT);
+    }
+    public static Collection<Rule> getRules(Environment environment) {
+        Collection<Rule> rules = Parser.rules;
+        if (environment != null) {
+            Rule operatorRule = new Rule("OPERATOR", new Collection<>());
+            Set<String> set = Stream.concat(
+                    environment.getBinaryOperators().keySet().stream(),
+                    environment.getUnaryOperators().keySet().stream()).collect(Collectors.toSet());
+            for (String name : new Collection<>(set.toArray())
+                    .to(String.class)
+                    .qsort((o1, o2) -> o2.length() - o1.length())) {
+                StringBuilder stringBuilder = new StringBuilder();
+                for (Character character : name.toCharArray()) {
+                    stringBuilder.append("\\").append(character);
+                }
+                operatorRule.getPatterns().add(
+                        Pattern.compile(stringBuilder.toString())
+                );
+            }
+
+            rules.add(operatorRule);
+        }
+        return rules;
     }
     public static void compile(String filename, String toFilename, Environment environment) throws Exception {
         System.out.println("Reading file...");
@@ -84,24 +105,7 @@ public class Parser {
 
         String code = new String(data, StandardCharsets.UTF_8);
 
-        Rule operatorRule = new Rule("OPERATOR", new Collection<>());
-
-        Set<String> set = Stream.concat(
-                environment.getBinaryOperators().keySet().stream(),
-                environment.getUnaryOperators().keySet().stream()).collect(Collectors.toSet());
-        for (String name: new Collection<>(set.toArray())
-                                .to(String.class)
-                                .qsort((o1, o2) -> o2.length() - o1.length())) {
-            StringBuilder stringBuilder = new StringBuilder();
-            for (Character character: name.toCharArray()) {
-                stringBuilder.append("\\").append(character);
-            }
-            operatorRule.getPatterns().add(
-                    Pattern.compile(stringBuilder.toString())
-            );
-        }
-
-        Parser.rules.add(operatorRule);
+        Collection<Rule> rules = getRules(environment);
 
         System.out.println("Lexing...");
         TokenHolder tokenHolder = new Lexer().lexFully(code, rules, toSkip);
@@ -113,8 +117,8 @@ public class Parser {
             precedence.put(entry.getKey(), entry.getValue().getPrecedence());
         }
         System.out.println("Building AST...");
-        Node program = ASTBuilder.build(tokenHolder, precedence, 100, true);
-        //System.out.println(program);
+        Node program = new ASTBuilder().build(tokenHolder, precedence, 100, true);
+        System.out.println(program);
         System.out.println("Writing to file...");
         FileOutputStream fileOut = new FileOutputStream(toFilename);
         ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
@@ -143,24 +147,7 @@ public class Parser {
 
         String code = new String(data, StandardCharsets.UTF_8);
 
-        Rule operatorRule = new Rule("OPERATOR", new Collection<>());
-
-        Set<String> set = Stream.concat(
-                environment.getBinaryOperators().keySet().stream(),
-                environment.getUnaryOperators().keySet().stream()).collect(Collectors.toSet());
-        for (String name: new Collection<>(set.toArray())
-                            .to(String.class)
-                            .qsort((o1, o2) -> o2.length() - o1.length())) {
-            StringBuilder stringBuilder = new StringBuilder();
-            for (Character character: name.toCharArray()) {
-                stringBuilder.append("\\").append(character);
-            }
-            operatorRule.getPatterns().add(
-                    Pattern.compile(stringBuilder.toString())
-            );
-        }
-        //System.out.println(operatorRule.getPatterns());
-        Parser.rules.add(operatorRule);
+        Collection<Rule> rules = getRules(environment);
 
         TokenHolder tokenHolder = new Lexer().lexFully(code, rules, toSkip);
 
@@ -170,7 +157,7 @@ public class Parser {
         for (Map.Entry<String, BinaryOperator> entry: environment.getBinaryOperators().entrySet()) {
             precedence.put(entry.getKey(), entry.getValue().getPrecedence());
         }
-        Node program = ASTBuilder.build(tokenHolder, precedence, 100, false, true, environment);
+        Node program = new ASTBuilder().build(tokenHolder, precedence, 100, false, true, environment);
         //System.out.println(program);
 
         Value result = Evaluator.evaluate(program, Environment.DEFAULT_ENVIRONMENT);

@@ -12,16 +12,15 @@ import java.net.URLClassLoader;
 import java.util.*;
 
 public class Evaluator {
-    public static HashMap<String, Value> EXPORTS = new HashMap<>();
+    public static Value EXPORTS = new Value(null);
     public static Value evaluate(Node node, Environment environment) throws Exception {
         switch (node.getType()) {
             case "program":
-                Value returnValue = new Value(null);
                 for (Node node1 : ((ProgramNode) node).getProgram()) {
                     Evaluator.evaluate(node1, environment);
                 }
-                returnValue.setProperties(EXPORTS);
-                EXPORTS = new HashMap<>();
+                Value returnValue = EXPORTS;
+                EXPORTS = new Value(null);
                 return returnValue;
             case "value":
                 return ((ValueNode) node).getValue();
@@ -115,7 +114,7 @@ public class Evaluator {
                             EXPORTS.put((String) field.get(exportedNode), evaluated);
                         } else throw new NoSuchFieldException();
                     } catch (NoSuchFieldException e) {
-                        throw new Exception("Bad export value");
+                        EXPORTS.setValue(evaluated.getValue());
                     }
                 } else {
                     EXPORTS.put(as, evaluated);
@@ -259,7 +258,6 @@ public class Evaluator {
                 }));
             case "class":
                 PSLClass pslClass = new PSLClass(environment);
-                //System.out.println(pslClass.getScope().getThiz());
                 ClassNode classNode = (ClassNode) node;
                 HashMap<String, PSLClassField> statics = new HashMap<>();
                 HashMap<String, ClassFieldNode> prototype = new HashMap<>();
@@ -425,7 +423,7 @@ public class Evaluator {
                 }
                 return Value.NULL;
             case "expand":
-                return new Value((Collection<Value>) Evaluator.evaluate(((ExpandNode) node).getNode(), environment).getValue());
+                return Evaluator.evaluate(((ExpandNode) node).getNode(), environment);
             case "switch":
                 SwitchNode switchNode = (SwitchNode) node;
                 Value switched = Evaluator.evaluate(switchNode.getValue(), environment);
@@ -437,6 +435,11 @@ public class Evaluator {
                     }
                 }
                 return Value.NULL;
+            case "custom":
+                CustomNode customNode = (CustomNode) node;
+                Value value1 = customNode.getValue();
+                Value parse = Evaluator.evaluate(customNode.getParse(), environment);
+                return ((PSLFunction) parse.getValue()).apply(new Collection<>(value1));
             default: throw new Exception("Don't know how to evaluate " + node.getType());
         }
     }
@@ -561,7 +564,8 @@ public class Evaluator {
                 new PSLFunction() {
                     @Override
                     public Value apply(Collection<Value> t) throws Exception {
-                        Object result = method.invoke(thiz, t.map(Value::getValue).toArray());
+                        Object[] arr = t.map(Value::getValue).toArray();
+                        Object result = method.invoke(thiz, arr);
                         return objectToValue(result, environment);
                     }
                 }

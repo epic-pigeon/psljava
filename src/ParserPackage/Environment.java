@@ -111,6 +111,22 @@ public class Environment {
                         } else {
                             result = new Value(value1 + String.valueOf(value2));
                         }
+                    } else if (value1 instanceof PSLFunction && value2 instanceof PSLFunction) {
+                        result = new Value(
+                                new PSLFunction() {
+                                    @Override
+                                    public Value apply(Collection<Value> t) throws Exception {
+                                        return ((PSLFunction) value2).apply(
+                                                node1.getType().equals("extend") ?
+                                                        (Collection<Value>) ((PSLFunction) value1).apply(t).getValue()
+                                                        :
+                                                        new Collection<>(
+                                                                ((PSLFunction) value1).apply(t)
+                                                        )
+                                        );
+                                    }
+                                }
+                        );
                     } else {
                         result = new Value(String.valueOf(value1) + value2);
                     }
@@ -305,6 +321,13 @@ public class Environment {
                         }
                     }
                 }, 15
+        ));
+        DEFAULT_ENVIRONMENT.defBinaryOperator("|>", new BinaryOperator(
+                (node1, node2, environment) -> {
+                    Value value1 = Evaluator.evaluate(node1, environment);
+                    Value value2 = Evaluator.evaluate(node2, environment);
+                    return ((PSLFunction) value2.getValue()).apply(new Collection<>(value1));
+                }, 16
         ));
         DEFAULT_ENVIRONMENT.defBinaryOperator(".", new BinaryOperator(
                 (node1, node2, environment) -> {

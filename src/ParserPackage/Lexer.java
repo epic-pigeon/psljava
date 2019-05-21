@@ -19,7 +19,7 @@ public class Lexer {
         position = 0;
         tokens = new Collection<>();
         this.code = code;
-        Collection<Rule> newRules = new Collection<>(new Rule("__LEXER_SETTINGS", Pattern.compile("/<([^/<>]|(\\\\.))*>/")));
+        Collection<Rule> newRules = new Collection<>(new Rule("__LEXER_SETTINGS", Pattern.compile("/<([^<>]|(\\\\.))*>/")));
         newRules.addAll(rules);
         rules = newRules;
         this.rules = rules;
@@ -129,13 +129,20 @@ public class Lexer {
                 if (matcher.find() && matcher.start() == 0) {
                     position += matcher.group().length();
                     if (rule.getName().equals("__LEXER_SETTINGS")) {
-                        this.rules = parseLexerSettings(matcher.group().substring(2, matcher.group().length() - 2).replaceAll("(\\\\)([/<>])", "$2"), rules);
+                        this.rules = parseLexerSettings(matcher.group().substring(2, matcher.group().length() - 2).replaceAll("(\\\\)([<>])", "$2"), rules);
                         return readNext();
-                    } else if (!rule.getName().endsWith("COMMENT")) {
-                        Token token = new Token(rule.getName(), matcher.group(), position, matcher.group().split("\\r?\\n").length - 1);
+                    } else if (rule.getName().endsWith("COMMENT")) {
+                        return readNext();
+                    } else if (rule.isKeyword()) {
+                        position--;
+                        Token token = new Token(rule.getName(), matcher.group().substring(0, matcher.group().length() - 1), rule, position, matcher.group().split("\\r?\\n").length - 1);
                         tokens.add(token);
                         return token;
-                    } else return readNext();
+                    } else {
+                        Token token = new Token(rule.getName(), matcher.group(), rule, position, matcher.group().split("\\r?\\n").length - 1);
+                        tokens.add(token);
+                        return token;
+                    }
                 }
             }
         }
@@ -153,21 +160,25 @@ public class Lexer {
                 new Rule("COMMAND_DELETE", "delete"),
                 new Rule("COMMAND_PRINT", "print"),
                 new Rule("COMMAND_LOAD", "load"),
+                new Rule("COMMAND_PARSE", "parse"),
                 new Rule("VALUE_IDENTIFIER", "[A-Z0-9_]+"),
                 new Rule("VALUE_REGEX", "\\`([^`\\\\]|(\\\\[`\\\\]))*\\`"),
-                new Rule("VALUE_STRING", "\\'[^']*\\'")
+                new Rule("VALUE_STRING", "\\'[^']*\\'"),
+                new Rule("MULTILINE_COMMENT", Pattern.compile("/\\*([^/])*\\*/")),
+                new Rule("SINGLE_LINE_COMMENT", Pattern.compile("//[^\n]*"))
         );
         TokenHolder tokens = new Lexer().lexFully(s, rules, toSkip);
-        Iterator<Token> iterator = tokens.iterator();
-        while (iterator.hasNext()) {
-            Token token = iterator.next();
+        while (tokens.hasNext()) {
+            Token token = tokens.next();
             if (token.getName().startsWith("COMMAND_")) {
                 if (token.getName().equals("COMMAND_DEFINE")) {
-                    Token name = iterator.next();
+                    Token name = tokens.next();
                     assert name.getName().equals("VALUE_IDENTIFIER");
-                    newRules.add(new Rule(new Collection<>(), name.getValue()));
+                    Collection<Rule> newnewRules = new Collection<>(new Rule(new Collection<>(), name.getValue()));
+                    newnewRules.addAll(newRules);
+                    newRules = newnewRules;
                 } else if (token.getName().equals("COMMAND_REDEFINE")) {
-                    Token ruleToken = iterator.next();
+                    Token ruleToken = tokens.next();
                     assert ruleToken.getName().equals("VALUE_IDENTIFIER");
                     Rule rule = newRules.findFirst(rule1 -> ruleToken.getValue().equals(rule1.getName()));
                     if (rule != null)
@@ -175,24 +186,36 @@ public class Lexer {
                     else
                         newRules.add(new Rule(new Collection<>(), ruleToken.getValue()));
                 } else if (token.getName().equals("COMMAND_ADD")) {
-                    Token ruleToken = iterator.next();
-                    Token regexToken = iterator.next();
+                    Token ruleToken = tokens.next();
+                    Token regexToken = tokens.next();
                     assert ruleToken.getName().equals("VALUE_IDENTIFIER");
                     assert regexToken.getName().equals("VALUE_REGEX");
                     Rule rule = newRules.findFirst(rule1 -> ruleToken.getValue().equals(rule1.getName()));
                     rule.addPattern(parseRegex(regexToken.getValue()));
                 } else if (token.getName().equals("COMMAND_DELETE")) {
-                    Token ruleToken = iterator.next();
+                    Token ruleToken = tokens.next();
                     assert ruleToken.getName().equals("VALUE_IDENTIFIER");
                     Rule rule = newRules.findFirst(rule1 -> ruleToken.getValue().equals(rule1.getName()));
                     if (rule != null) newRules.remove(rule);
                 } else if (token.getName().equals("COMMAND_PRINT")) {
-                    Token ruleToken = iterator.next();
+                    Token ruleToken = tokens.next();
                     assert ruleToken.getName().equals("VALUE_IDENTIFIER");
                     Rule rule = newRules.findFirst(rule1 -> ruleToken.getValue().equals(rule1.getName()));
                     System.out.println(rule);
+                } else if (token.getName().equals("COMMAND_PARSE")) {
+                    Token ruleToken = tokens.next();
+                    assert ruleToken.getName().equals("VALUE_IDENTIFIER");
+                    Rule rule = newRules.findFirst(rule1 -> ruleToken.getValue().equals(rule1.getName()));
+                    String code = tokens.next().getValue();
+                    code = code.substring(1, code.length() - 1);
+                    rule.setParse(code);
+                    if (tokens.lookUp() != null && tokens.lookUp().getName().equals("VALUE_STRING")) {
+                        code = tokens.next().getValue();
+                        code = code.substring(1, code.length() - 1);
+                        rule.setRuntimeParse(code);
+                    }
                 } else if (token.getName().equals("COMMAND_LOAD")) {
-                    Token fileToken = iterator.next();
+                    Token fileToken = tokens.next();
                     assert fileToken.getName().equals("VALUE_STRING");
                     String filename = parseString(fileToken.getValue());
                     File file = new File(filename);

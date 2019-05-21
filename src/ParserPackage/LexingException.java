@@ -6,7 +6,7 @@ public class LexingException extends Exception {
     private int position;
 
     public LexingException(Collection<Token> tokens, int position) {
-        super("Lexing exception on position " + position);
+        super("Lexing exception on position " + position + ", tokens: " + tokens);
         this.tokens = tokens;
         this.position = position;
     }
