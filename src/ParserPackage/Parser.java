@@ -122,7 +122,7 @@ public class Parser {
         }
         System.out.println("Building AST...");
         Node program = new ASTBuilder().build(tokenHolder, precedence, 100, true);
-        System.out.println(program);
+        //System.out.println(program);
         System.out.println("Writing to file...");
         FileOutputStream fileOut = new FileOutputStream(toFilename);
         ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
@@ -153,19 +153,14 @@ public class Parser {
 
         Collection<Rule> rules = getRules(environment);
 
-        TokenHolder tokenHolder = new Lexer().lexFully(code, rules, toSkip);
-
-        //System.out.println(tokenHolder);
+        TokenHolder tokenHolder = new Lexer().lex(code, rules, toSkip);
 
         HashMap<String, Integer> precedence = new HashMap<>();
         for (Map.Entry<String, BinaryOperator> entry: environment.getBinaryOperators().entrySet()) {
             precedence.put(entry.getKey(), entry.getValue().getPrecedence());
         }
-        Node program = new ASTBuilder().build(tokenHolder, precedence, 100, false, true, environment);
-        //System.out.println(program);
+        Node program = new ASTBuilder().build(tokenHolder, precedence, 100, false, false, environment);
 
-        Value result = Evaluator.evaluate(program, Environment.DEFAULT_ENVIRONMENT);
-        //System.out.println("Properties: " + result.getProperties());
-        return result;
+        return Evaluator.evaluate(program, Environment.DEFAULT_ENVIRONMENT);
     }
 }

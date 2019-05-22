@@ -127,14 +127,8 @@ public class Evaluator {
                         ((BinaryNode) node).getRight(),
                         environment
                 );
-            case "functionBody":
-                for (Node node1: ((BodyNode) node).getExpressions()) try {
-                    Evaluator.evaluate(node1, environment);
-                } catch (ReturnException e) {
-                    return e.getReturnValue();
-                }
-                return Value.NULL;
             case "body":
+            case "functionBody":
                 Collection<Value> result = new Collection<>();
                 for (Node node1: ((BodyNode) node).getExpressions()) {
                     result.add(Evaluator.evaluate(node1, environment));
@@ -395,8 +389,9 @@ public class Evaluator {
                 return whenNode.getOtherwise() == null ? Value.NULL : Evaluator.evaluate(whenNode.getOtherwise(), environment);
             case "unary":
                 UnaryNode unaryNode = (UnaryNode) node;
-                return environment.getUnaryOperator(unaryNode.getOperator())
-                        .getAction().apply(unaryNode.getValue(), environment);
+                UnaryOperator unaryOperator = environment.getUnaryOperator(unaryNode.getOperator());
+                if (unaryOperator == null) throw new Exception("Unary operator '" + unaryNode.getOperator() + "' not found");
+                return unaryOperator.getAction().apply(unaryNode.getValue(), environment);
             case "operator":
                 OperatorNode operatorNode  = (OperatorNode) node;
                 PSLFunction function = (PSLFunction) Evaluator.evaluate(operatorNode.getFunction(), environment).getValue();
@@ -499,7 +494,11 @@ public class Evaluator {
                     }
                 }
                 scope.defVariable("this", scope.getThiz());
-                return Evaluator.evaluate(node.getBody(), scope);
+                try {
+                    return Evaluator.evaluate(node.getBody(), scope);
+                } catch (ReturnException e) {
+                    return e.getReturnValue();
+                }
             }
 
             @Override

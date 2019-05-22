@@ -36,7 +36,8 @@ public class Environment {
         return variable;
     }
     public Variable getVariable(String name) {
-        return variables.getOrDefault(name, null);
+        Environment environment = lookupVariable(name);
+        if (environment == null) return null; else return environment.variables.getOrDefault(name, null);
     }
     public Variable setVariable(String name, Value value) {
         Environment environment = lookupVariable(name);
@@ -65,7 +66,8 @@ public class Environment {
         return null;
     }
     public BinaryOperator getBinaryOperator(String name) {
-        return binaryOperators.getOrDefault(name, null);
+        Environment environment = lookUpBinaryOperator(name);
+        if (environment == null) return null; else return environment.binaryOperators.getOrDefault(name, null);
     }
 
     public BinaryOperator setBinaryOperator(String name, BinaryOperator operator) {
@@ -595,7 +597,8 @@ public class Environment {
         return null;
     }
     public UnaryOperator getUnaryOperator(String name) {
-        return unaryOperators.getOrDefault(name, null);
+        Environment environment = lookUpUnaryOperator(name);
+        if (environment == null) return null; else return environment.unaryOperators.getOrDefault(name, null);
     }
 
     public UnaryOperator setUnaryOperator(String name, UnaryOperator operator) {

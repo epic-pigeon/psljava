@@ -36,7 +36,8 @@ public class ASTBuilder {
         if (!this.executeImmediately) {
             ProgramNode node = new ProgramNode();
             while (tokenHolder.hasNext()) {
-                node.addNode(parseExpression());
+                Node expression = parseExpression();
+                node.addNode(expression);
                 checkAndSkip("SEMICOLON");
             }
             return node;
@@ -235,14 +236,7 @@ public class ASTBuilder {
         });
     }
     private Node parseExpression() throws Exception {
-        return maybeCallOrIndex(() -> {
-            try {
-                return maybeBinary(parseAtom(), 0);
-            } catch (Exception e) {
-                e.printStackTrace();
-                return null;
-            }
-        });
+        return maybeSomething(parseAtom(), 0);
     }
     private TryNode parseTry() throws Exception {
         TryNode tryNode = new TryNode();
@@ -350,14 +344,7 @@ public class ASTBuilder {
         if (precedence > functionPrecedence) {
             return parseNoCallAtom();
         } else {
-            return maybeCallOrIndex(() -> {
-                try {
-                    return parseNoCallAtom();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    return null;
-                }
-            });
+            return maybeSomething(parseNoCallAtom(), functionPrecedence);
         }
     }
     private Node parseNoCallAtom() throws Exception {
@@ -385,8 +372,6 @@ public class ASTBuilder {
                     return parseIf();
                 } else if (checkAndSkip("FUNCTION") != null) {
                     return parseFunction();
-                } else if (checkToken("IDENTIFIER")) {
-                    return parseVariable();
                 } else if (checkToken("EXPORT")) {
                     return parseExport();
                 } else if (checkToken("RETURN")) {
@@ -423,6 +408,8 @@ public class ASTBuilder {
                     return parseThrow();
                 } else if (checkToken("TRY")) {
                     return parseTry();
+                } else if (checkToken("IDENTIFIER") || (tokenHolder.lookUp() != null && tokenHolder.lookUp().getRule().isKeyword())) {
+                    return parseVariable();
                 } else {
                     Token token = tokenHolder.lookUp();
                     if (token.getRule().getParse() != null) {
@@ -649,8 +636,7 @@ public class ASTBuilder {
         };
     }
     private Node maybePropertied(Supplier<Node> lambda) throws Exception {
-        Node node = new ValueNode(Value.NULL);
-        if (!checkToken("LEFT_CURLY_PAREN")) node = lambda.get();
+        Node node = lambda.get();
         if (checkToken("LEFT_CURLY_PAREN") || checkToken("OVERRIDE")) {
             return new PropertiedNode(checkAndSkip("OVERRIDE") != null, node, parseProperties());
         } else return node;
@@ -706,7 +692,11 @@ public class ASTBuilder {
         return new VariableNode(parseIdentifier());
     }
     private String parseIdentifier() throws Exception {
-        return skipToken("IDENTIFIER").getValue();
+        Token token = tokenHolder.lookUp();
+        if (token.getRule().isKeyword() || token.getName().equals("IDENTIFIER")) {
+            tokenHolder.next();
+            return token.getValue();
+        } else throw new Exception("Not an identifier");
     }
     private ValueNode parseString() throws Exception {
         Token token = skipToken("STRING");
@@ -744,6 +734,41 @@ public class ASTBuilder {
             } else return left;
         }
         return left;
+    }
+    private Node maybeSomething(Node expr, int myPrecedence) throws Exception {
+        while (true) {
+            if (checkToken("LEFT_PAREN")) {
+                expr = parseCall(expr);
+            } else if (checkToken("LEFT_SQUARE_PAREN")) {
+                expr = parseIndex(expr);
+            } else if (nextOperator()) {
+                Token operator = tokenHolder.lookUp();
+                int hisPrecedence = precedence.get(operator.getValue());
+                if (hisPrecedence > myPrecedence) {
+                    tokenHolder.next();
+                    Node atom = parseAtom(hisPrecedence);
+                    Node right = hisPrecedence > functionPrecedence ?
+                            maybeBinary(atom, hisPrecedence) :
+                            maybeCallOrIndex(() -> {
+                                try {
+                                    return maybeBinary(atom, hisPrecedence);
+                                } catch (Exception e) {
+                                    e.printStackTrace();
+                                    return null;
+                                }
+                            });
+                    BinaryNode node = new BinaryNode();
+                    node.setLeft(expr);
+                    node.setRight(right);
+                    node.setOperator(operator.getValue());
+                    return maybeBinary(node, myPrecedence);
+                } else return expr;
+            } else if (checkToken("LEFT_CURLY_PAREN") || checkToken("OVERRIDE")) {
+                return new PropertiedNode(checkAndSkip("OVERRIDE") != null, expr, parseProperties());
+            } else {
+                return expr;
+            }
+        }
     }
     private Value tokenToPSL(Token token) throws Exception {
         Value returnValue = new Value(token.getName());

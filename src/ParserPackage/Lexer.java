@@ -71,7 +71,7 @@ public class Lexer {
 
             private Token getByPosition(int pos) throws Exception {
                 while (pos >= tokens.size()) {
-                    readNext();
+                    if (readNext() == null) return null;
                 }
                 return tokens.get(pos);
             }
@@ -79,8 +79,7 @@ public class Lexer {
             @Override
             public boolean hasNext() throws Exception {
                 try {
-                    getByPosition(this.position);
-                    return true;
+                    return getByPosition(this.position) != null;
                 } catch (LexingException e) {
                     return false;
                 }
