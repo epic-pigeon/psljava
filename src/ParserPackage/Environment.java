@@ -392,6 +392,28 @@ public class Environment {
                         }
                     }
             ));
+            stdout.put("write_line", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> args) throws Exception {
+                            for (Value arg : args) {
+                                System.out.println(arg);
+                            }
+                            return Value.NULL;
+                        }
+                    }
+            ));
+            stdout.put("write", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> args) throws Exception {
+                            for (Value arg : args) {
+                                System.out.print(arg);
+                            }
+                            return Value.NULL;
+                        }
+                    }
+            ));
             Value streamValue = new Value();
             streamValue.put("write", new Value(new PSLFunction() {
                 @Override

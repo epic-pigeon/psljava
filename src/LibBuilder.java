@@ -56,6 +56,26 @@ public class LibBuilder {
                                     }
                                 }
                         ));
+                        fileIn.put("read_word", new Value(
+                                new PSLFunction() {
+                                    @Override
+                                    public Value apply(Collection<Value> t) throws Exception {
+                                        return new Value(
+                                                fileReader.next()
+                                        );
+                                    }
+                                }
+                        ));
+                        fileIn.put("has_word", new Value(
+                                new PSLFunction() {
+                                    @Override
+                                    public Value apply(Collection<Value> t) throws Exception {
+                                        return new Value(
+                                                fileReader.hasNext()
+                                        );
+                                    }
+                                }
+                        ));
                         fileIn.put("has_number", new Value(
                                 new PSLFunction() {
                                     @Override

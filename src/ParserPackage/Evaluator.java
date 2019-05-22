@@ -329,7 +329,22 @@ public class Evaluator {
                     } else {
                         Value index = Evaluator.evaluate(indexNode.getBegin(), environment);
                         if (index.getValue() instanceof Number) {
-                            return arr.get(((Number) index.getValue()).intValue());
+                            int ind = ((Number) index.getValue()).intValue();
+                            return new SettableValue(arr.size() > ind ? arr.get(ind) : Value.NULL) {
+                                @Override
+                                public Value set(Value value) throws Exception {
+                                    while (ind >= arr.size()) {
+                                        arr.add(Value.NULL);
+                                    }
+                                    return arr.set(ind, value);
+                                }
+
+                                @Override
+                                public Value setProp(String name, Value value) throws Exception {
+                                    arr.get(ind).put(name, value);
+                                    return value;
+                                }
+                            };
                         } else {
                             throw new Exception("Index value should be an integer");
                         }
