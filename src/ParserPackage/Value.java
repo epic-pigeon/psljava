@@ -7,6 +7,7 @@ public class Value //extends JSONToString
     implements Serializable
 {
     private static final long serialVersionUID = 13987458314534165L;
+    private HashMap<String, Value> prototype;
     public boolean isSettable() {
         return false;
     }
@@ -22,7 +23,7 @@ public class Value //extends JSONToString
                 value = ((Double) value).intValue();
             }
         }
-        this.value = value;
+        setValue(value);
     }
 
     public static final Value NULL = new Value(null);
@@ -41,7 +42,7 @@ public class Value //extends JSONToString
     }
 
     public Value get(String key) throws Exception {
-        return properties.get(key);
+        return properties.getOrDefault(key, prototype != null ? prototype.getOrDefault(key, Value.NULL) : Value.NULL);
     }
 
     public Value put(String key, Value value) throws Exception {
@@ -53,6 +54,13 @@ public class Value //extends JSONToString
     }
 
     public void setValue(Object value) {
+        if (value instanceof Number) {
+            prototype = Prototypes.NUMBER;
+        } else if (value instanceof String) {
+            prototype = Prototypes.STRING;
+        } else if (value instanceof Collection) {
+            prototype = Prototypes.ARRAY;
+        }
         this.value = value;
     }
 
@@ -117,5 +125,13 @@ public class Value //extends JSONToString
         } else {
             return Objects.equals(obj1, obj2); //&& obj1.getClass() == obj2.getClass();
         }
+    }
+
+    public HashMap<String, Value> getPrototype() {
+        return prototype;
+    }
+
+    public void setPrototype(HashMap<String, Value> prototype) {
+        this.prototype = prototype;
     }
 }

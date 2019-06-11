@@ -9,7 +9,7 @@ public abstract class SettableValue extends Value {
 
     public SettableValue(Value value) {
         if (value != null) {
-            this.value = value.getValue();
+            setValue(value.getValue());
             this.properties = value.getProperties();
         }
         realValue = value;

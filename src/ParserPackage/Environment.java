@@ -340,9 +340,13 @@ public class Environment {
                     } else {
                         prop = Evaluator.evaluate(node2, environment).toString();
                     }
+                    Environment scope = environment.extend();
+                    scope.setThiz(value2);
                     if (value2.isSettable()) {
                         Value val = value2.get(prop);
-                        return new SettableValue(val) {
+                        return new SettableValue(
+                                new EnvironmentValue(val, scope)
+                        ) {
                             @Override
                             public Value set(Value value1) throws Exception {
                                 return ((SettableValue)value2).setProp(prop, value1);
@@ -353,23 +357,13 @@ public class Environment {
                                 return value2.get(prop).put(name, value1);
                             }
                         };
-                    } else return value2.get(prop);
+                    } else return new EnvironmentValue(value2.get(prop), scope);
                 }, 200
         ));
         Value system = new Value(null);
-        Value fs = new Value(null);
         Value stdout = new Value(null);
         Value stdin = new Value(null);
-        Value math = new Value(null);
         try {
-            math.put("random", new Value(
-                    new PSLFunction() {
-                        @Override
-                        public Value apply(Collection<Value> t) throws Exception {
-                            return new Value(Math.random());
-                        }
-                    }
-            ));
             stdout.put("println", new Value(
                     new PSLFunction() {
                         @Override
@@ -443,6 +437,16 @@ public class Environment {
                         }
                     }
             ));
+            Value inNumberStream = new Value();
+            inNumberStream.put("read", new Value(
+                    new PSLFunction() {
+                        @Override
+                        public Value apply(Collection<Value> t) throws Exception {
+                            return new Value(new Scanner(System.in).nextDouble());
+                        }
+                    }
+            ));
+            stdin.put("number_stream", inNumberStream);
             stdin.put("line_stream", inLineStream);
             stdin.put("word_stream", inWordStream);
             stdin.put("read_line", new Value(
@@ -477,34 +481,12 @@ public class Environment {
                         }
                     }
             ));
-            fs.put("file_from", new Value(
-                    new PSLFunction() {
-                        @Override
-                        public Value apply(Collection<Value> t) throws Exception {
-                             String filename = (String) t.get(0).getValue();
-                             File file = new File(filename);
-                             Value result = new Value(filename);
-                             result.put("read", new Value(
-                                     new PSLFunction() {
-                                         @Override
-                                         public Value apply(Collection<Value> t) throws Exception {
-                                             byte[] data = new byte[(int) file.length()];
-                                             new FileInputStream(file).read(data);
-                                             return new Value(new String(data, StandardCharsets.UTF_8));
-                                         }
-                                     }
-                             ));
-                             return result;
-                        }
-                    }
-            ));
             system.put("stdout", stdout);
             system.put("stdin", stdin);
         } catch (Exception ignored) {
             new Exception("Internal Error").printStackTrace();
         }
         DEFAULT_ENVIRONMENT.defVariable("system", system);
-        DEFAULT_ENVIRONMENT.defVariable("fs", fs);
         DEFAULT_ENVIRONMENT.defVariable("null", new Value() {
             @Override
             public boolean isSettable() {
@@ -566,7 +548,6 @@ public class Environment {
                 return super.equals(obj, strict);
             }
         });
-        DEFAULT_ENVIRONMENT.defVariable("math", math);
         DEFAULT_ENVIRONMENT.defVariable("typeof", new Value(
                 new PSLFunction() {
                     @Override

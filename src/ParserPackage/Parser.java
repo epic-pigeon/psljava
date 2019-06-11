@@ -153,7 +153,7 @@ public class Parser {
 
         Collection<Rule> rules = getRules(environment);
 
-        TokenHolder tokenHolder = new Lexer().lex(code, rules, toSkip);
+        TokenHolder tokenHolder = new Lexer().lexFully(code, rules, toSkip);
 
         HashMap<String, Integer> precedence = new HashMap<>();
         for (Map.Entry<String, BinaryOperator> entry: environment.getBinaryOperators().entrySet()) {

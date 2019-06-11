@@ -1,17 +1,14 @@
-import ParserPackage.ASTNodes.ExportNode;
-import ParserPackage.ASTNodes.ProgramNode;
-import ParserPackage.ASTNodes.ValueNode;
 import ParserPackage.Collection;
 import ParserPackage.Evaluator;
 import ParserPackage.PSLFunction;
 import ParserPackage.Value;
 
-import java.io.*;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.util.HashMap;
-import java.util.Map;
 import java.util.Scanner;
 
-public class LibBuilder {
+public class FSLibBuilder extends LibBuilder {
     public static void main(String[] args) throws Exception {
         Value fs = new Value();
         fs.put("file", new Value(
@@ -28,6 +25,44 @@ public class LibBuilder {
                         Value fileValue = new Value();
                         Value fileIn = new Value();
                         Value fileOut = new Value();
+                        Value fileInNumberStream = new Value();
+                        fileInNumberStream.put("read", new Value(
+                                new PSLFunction() {
+                                    @Override
+                                    public Value apply(Collection<Value> t) throws Exception {
+                                        return new Value(
+                                                fileReader.hasNextDouble() ?
+                                                        fileReader.nextDouble():
+                                                        fileReader.nextInt()
+                                        );
+                                    }
+                                }
+                        ));
+                        fileIn.put("number_stream", fileInNumberStream);
+                        Value fileInLineStream = new Value();
+                        fileInLineStream.put("read", new Value(
+                                new PSLFunction() {
+                                    @Override
+                                    public Value apply(Collection<Value> t) throws Exception {
+                                        return new Value(
+                                                fileReader.nextLine()
+                                        );
+                                    }
+                                }
+                        ));
+                        fileIn.put("line_stream", fileInLineStream);
+                        Value fileInWordStream = new Value();
+                        fileInWordStream.put("read", new Value(
+                                new PSLFunction() {
+                                    @Override
+                                    public Value apply(Collection<Value> t) throws Exception {
+                                        return new Value(
+                                                fileReader.next()
+                                        );
+                                    }
+                                }
+                        ));
+                        fileIn.put("word_stream", fileInWordStream);
                         fileIn.put("read_line", new Value(
                                 new PSLFunction() {
                                     @Override
@@ -117,19 +152,5 @@ public class LibBuilder {
         HashMap<String, Value> exports = new HashMap<>();
         exports.put("fs", fs);
         build("lib/fs", exports);
-    }
-
-    public static void build(String path, HashMap<String, Value> exports) throws Exception {
-        ProgramNode programNode = new ProgramNode();
-        for (Map.Entry<String, Value> entry: exports.entrySet()) {
-            programNode.addNode(new ExportNode(
-                    new ValueNode(entry.getValue()),
-                    entry.getKey()
-            ));
-        }
-        FileOutputStream fileOut = new FileOutputStream(path);
-        ObjectOutputStream objectOut = new ObjectOutputStream(fileOut);
-        objectOut.writeObject(programNode);
-        objectOut.close();
     }
 }

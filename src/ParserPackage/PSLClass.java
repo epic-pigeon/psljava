@@ -7,7 +7,7 @@ import java.util.Map;
 
 public class PSLClass extends Value {
     private Environment scope;
-    private HashMap<String, ClassFieldNode> prototype = new HashMap<>();
+    private HashMap<String, ClassFieldNode> classPrototype = new HashMap<>();
     private HashMap<String, PSLClassField> statics = new HashMap<>();
     public PSLClass(Environment environment) {
         super(null);
@@ -43,25 +43,25 @@ public class PSLClass extends Value {
     public Value instantiate(Collection<Value> args) throws Exception {
         Value result = new ThisValue();
         scope.setThiz(result);
-        for (Map.Entry<String, ClassFieldNode> entry: prototype.entrySet()) {
+        for (Map.Entry<String, ClassFieldNode> entry: classPrototype.entrySet()) {
             Value value = Evaluator.evaluate(entry.getValue(), scope);
             Value defaultValue = ((PSLClassField) value).getDefaultValue();
             value.setValue(defaultValue == null ? Value.NULL : defaultValue.getValue());
             result.put(entry.getKey(), value);
         }
-        if (prototype.get("constructor") != null) {
-            PSLClassField constructor = (PSLClassField) Evaluator.evaluate(prototype.get("constructor"), scope);
+        if (classPrototype.get("constructor") != null) {
+            PSLClassField constructor = (PSLClassField) Evaluator.evaluate(classPrototype.get("constructor"), scope);
             ((PSLFunction) constructor.getDefaultValue().getValue()).apply(args);
         }
         return result;
     }
 
-    public HashMap<String, ClassFieldNode> getPrototype() {
-        return prototype;
+    public HashMap<String, ClassFieldNode> getClassPrototype() {
+        return classPrototype;
     }
 
-    public void setPrototype(HashMap<String, ClassFieldNode> prototype) {
-        this.prototype = prototype;
+    public void setClassPrototype(HashMap<String, ClassFieldNode> classPrototype) {
+        this.classPrototype = classPrototype;
     }
 
     @Override

@@ -3,9 +3,6 @@ package ParserPackage;
 import ParserPackage.ASTNodes.*;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
 import java.lang.reflect.*;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -43,7 +40,8 @@ public class Evaluator {
 
                         @Override
                         public Value setProp(String name, Value value) throws Exception {
-                            return environment.setVariable(name, value).getValue();
+                            environment.setVariable(name, value);
+                            return value;
                         }
                     };
                     for (Map.Entry<String, Variable> entry : environment.getVariables().entrySet()) {
@@ -90,7 +88,7 @@ public class Evaluator {
                         }
                     };
                 } else {
-                    return new SettableValue(Value.NULL) {
+                    return new SettableValue(null) {
                         @Override
                         public Value set(Value value) {
                             return environment.defVariable(((VariableNode) node).getValue(), value).getValue();
@@ -226,10 +224,42 @@ public class Evaluator {
                     val.setProperties(props);
                 } else {
                     for (Map.Entry<String, Node> entry: propertiedNode.getProperties().entrySet()) {
-                        val.put(entry.getKey(), Evaluator.evaluate(entry.getValue(), environment));
+                        if (entry.getValue() != null) {
+                            val.put(entry.getKey(), Evaluator.evaluate(entry.getValue(), environment));
+                        } else {
+                            val.put(entry.getKey(), Evaluator.evaluate(new VariableNode(entry.getKey()), environment));
+                        }
                     }
                 }
-                return val;
+                return new SettableValue(val) {
+                    @Override
+                    public Value set(Value value) throws Exception {
+                        for (Map.Entry<String, Value> entry: val.getProperties().entrySet()) {
+                            if (entry.getValue().isSettable()) {
+                                if (value.getProperties().containsKey(entry.getKey())) {
+                                    ((SettableValue) entry.getValue()).set(value.get(entry.getKey()));
+                                } else {
+                                    ((SettableValue) entry.getValue()).set(Value.NULL);
+                                }
+                            }
+                        }
+                        return val;
+                    }
+
+                    @Override
+                    public Value setProp(String name, Value value) throws Exception {
+                        for (Map.Entry<String, Value> entry: val.getProperties().entrySet()) {
+                            if (entry.getValue().isSettable()) {
+                                if (value.getProperties().containsKey(entry.getKey())) {
+                                    ((SettableValue) entry.getValue()).setProp(name, value.get(entry.getKey()));
+                                } else {
+                                    ((SettableValue) entry.getValue()).setProp(name, Value.NULL);
+                                }
+                            }
+                        }
+                        return val;
+                    }
+                };
             case "new":
                 NewNode newNode = (NewNode) node;
                 Value classValue = Evaluator.evaluate(newNode.getClazz(), environment);
@@ -262,7 +292,7 @@ public class Evaluator {
                         prototype.put(entry.getKey(), entry.getValue());
                     }
                 }
-                pslClass.setPrototype(prototype);
+                pslClass.setClassPrototype(prototype);
                 pslClass.setStatics(statics);
                 return pslClass;
             case "field":
@@ -303,7 +333,52 @@ public class Evaluator {
                 for (Node node1 : ((ArrayNode) node).getArray()) {
                     array.add(Evaluator.evaluate(node1, environment));
                 }
-                return new Value(array);
+
+                return new SettableValue(new Value(array)) {
+                    @Override
+                    public Value set(Value value3) throws Exception {
+                        if (value3.getValue() instanceof Collection) {
+                            Collection<Value> values1 = (Collection<Value>) value3.getValue();
+                            for (int i = 0; i < array.size(); i++) {
+                                Value element = array.get(i);
+                                if (element.isSettable()) {
+                                    if (i < values1.size()) {
+                                        ((SettableValue) element).set(values1.get(i));
+                                    } else {
+                                        ((SettableValue) element).set(Value.NULL);
+                                    }
+                                }
+                            }
+                        } else {
+                            for (Value element: array) {
+                                if (element.isSettable()) ((SettableValue) element).set(value3);
+                            }
+                        }
+                        return value3;
+                    }
+
+                    @Override
+                    public Value setProp(String name1, Value value3) throws Exception {
+                        if (value3.getValue() instanceof Collection) {
+                            Collection<Value> values1 = (Collection<Value>) value3.getValue();
+                            for (int i = 0; i < array.size(); i++) {
+                                Value element = array.get(i);
+                                if (element.isSettable()) {
+                                    if (i < values1.size()) {
+                                        ((SettableValue) element).setProp(name1, values1.get(i));
+                                    } else {
+                                        ((SettableValue) element).setProp(name1, Value.NULL);
+                                    }
+                                }
+                            }
+                        } else {
+                            for (Value element: array) {
+                                if (element.isSettable()) ((SettableValue) element).setProp(name1, value3);
+                            }
+                        }
+                        return value3;
+                    }
+                };
             case "index":
                 IndexNode indexNode = (IndexNode) node;
                 Value value = Evaluator.evaluate(indexNode.getValue(), environment);
@@ -449,7 +524,9 @@ public class Evaluator {
                 CustomNode customNode = (CustomNode) node;
                 Value value1 = customNode.getValue();
                 Value parse = Evaluator.evaluate(customNode.getParse(), environment);
-                return ((PSLFunction) parse.getValue()).apply(new Collection<>(value1));
+                return ((PSLFunction) parse.getValue()).apply(
+                        new Collection<>(value1, environmentToPSL(environment))
+                );
             case "throw":
                 throw new PSLException(Evaluator.evaluate(((ThrowNode) node).getNode(), environment));
             case "try":
@@ -538,7 +615,16 @@ public class Evaluator {
                 arguments.add(val);
             }
         }
-        return function.apply(arguments);
+        Environment scope = environment;
+
+        if (functionValue instanceof EnvironmentValue) {
+            scope = ((EnvironmentValue) functionValue).getEnvironment();
+        } else if (functionValue instanceof SettableValue
+                && ((SettableValue) functionValue).getRealValue() instanceof EnvironmentValue) {
+            scope = ((EnvironmentValue) ((SettableValue) functionValue).getRealValue()).getEnvironment();
+        }
+
+        return function.apply(arguments, scope);
     }
     private static Exception croak(String reason) {
         Exception throwable = new Exception(reason);
@@ -635,7 +721,7 @@ public class Evaluator {
                 ClassFieldNode classFieldNode = new ClassFieldNode();
                 classFieldNode.setValue(new ValueNode(methodToValue(method, environment)));
 
-                cls.getPrototype().put(method.getName(), classFieldNode);
+                cls.getClassPrototype().put(method.getName(), classFieldNode);
             }
         }
 
@@ -651,7 +737,7 @@ public class Evaluator {
                 ClassFieldNode classFieldNode = new ClassFieldNode();
                 classFieldNode.setValue(new ValueNode(objectToValue(field.get(null), environment)));
 
-                cls.getPrototype().put(field.getName(), classFieldNode);
+                cls.getClassPrototype().put(field.getName(), classFieldNode);
             }
         }
 
@@ -665,7 +751,7 @@ public class Evaluator {
                 ClassFieldNode classFieldNode = new ClassFieldNode();
                 classFieldNode.setValue(new ValueNode(buildClass(clas, environment)));
 
-                cls.getPrototype().put(clas.getSimpleName(), classFieldNode);
+                cls.getClassPrototype().put(clas.getSimpleName(), classFieldNode);
             }
         }
 
@@ -685,8 +771,37 @@ public class Evaluator {
                         }
                 )
         ));
-        cls.getPrototype().put("constructor", constructorNode);
+        cls.getClassPrototype().put("constructor", constructorNode);
 
         return cls;
+    }
+
+    private static Value environmentToPSL(Environment environment) throws Exception {
+        Value value = new Value();
+        value.put("evaluate", new Value(
+                new PSLFunction() {
+                    @Override
+                    public Value apply(Collection<Value> t) throws Exception {
+                        return Evaluator.evaluate((Node) t.get(0).get("node").getValue(), environment);
+                    }
+                }
+        ));
+        value.put("define_variable", new Value(
+                new PSLFunction() {
+                    @Override
+                    public Value apply(Collection<Value> t) throws Exception {
+                        return environment.defVariable((String) t.get(0).getValue(), t.get(1)).getValue();
+                    }
+                }
+        ));
+        value.put("set_variable", new Value(
+                new PSLFunction() {
+                    @Override
+                    public Value apply(Collection<Value> t) throws Exception {
+                        return environment.setVariable((String) t.get(0).getValue(), t.get(1)).getValue();
+                    }
+                }
+        ));
+        return value;
     }
 }

@@ -15,12 +15,15 @@ public class ASTBuilder {
     private int functionPrecedence;
     private boolean resolveImport;
     private boolean executeImmediately;
-    public  Node build(TokenHolder tokens, HashMap<String, Integer> precedence, int functionPrecedence) throws Exception {
+
+    public Node build(TokenHolder tokens, HashMap<String, Integer> precedence, int functionPrecedence) throws Exception {
         return build(tokens, precedence, functionPrecedence, false);
     }
+
     public Node build(TokenHolder tokens, HashMap<String, Integer> precedence, int functionPrecedence, boolean resolveImport) throws Exception {
         return build(tokens, precedence, functionPrecedence, resolveImport, false, null);
     }
+
     private void init(TokenHolder tokens, HashMap<String, Integer> precedence, int functionPrecedence,
                       boolean resolveImport, boolean executeImmediately, Environment environment) {
         this.precedence = precedence;
@@ -30,8 +33,9 @@ public class ASTBuilder {
         this.executeImmediately = executeImmediately;
         tokenHolder = tokens;
     }
+
     public Node build(TokenHolder tokens, HashMap<String, Integer> precedence, int functionPrecedence,
-                                    boolean resolveImport, boolean executeImmediately, Environment environment) throws Exception {
+                      boolean resolveImport, boolean executeImmediately, Environment environment) throws Exception {
         init(tokens, precedence, functionPrecedence, resolveImport, executeImmediately, environment);
         if (!this.executeImmediately) {
             ProgramNode node = new ProgramNode();
@@ -55,9 +59,11 @@ public class ASTBuilder {
             return new ValueNode(returnValue);
         }
     }
+
     private Token checkAndSkip(String type) throws Exception {
         return checkToken(type) ? skipToken(type) : null;
     }
+
     private boolean checkToken(String type) {
         Token token;
         try {
@@ -67,15 +73,18 @@ public class ASTBuilder {
         }
         return token != null && token.getName().equals(type);
     }
+
     private Token skipToken(String type) throws Exception {
         if (checkToken(type)) {
             return tokenHolder.next();
         } else throw new Exception(type + " expected, got " + tokenHolder.lookUp().getName());
     }
-    private<T> Collection<T> delimited(String start, String separator, String stop, Supplier<T> parser) throws Exception {
+
+    private <T> Collection<T> delimited(String start, String separator, String stop, Supplier<T> parser) throws Exception {
         return delimited(start, separator, stop, parser, false);
     }
-    private<T> Collection<T> delimited(String start, String separator, String stop, Supplier<T> parser, boolean separatorOptional) throws Exception {
+
+    private <T> Collection<T> delimited(String start, String separator, String stop, Supplier<T> parser, boolean separatorOptional) throws Exception {
         Collection<T> nodes = new Collection<>();
         boolean first = true;
         if (start != null) skipToken(start);
@@ -105,9 +114,11 @@ public class ASTBuilder {
         if (stop != null) skipToken(stop);
         return nodes;
     }
+
     private FunctionNode parseFunction() throws Exception {
         return parseFunction(true);
     }
+
     private FunctionNode parseFunction(boolean identifierPossible) throws Exception {
         FunctionNode node = new FunctionNode();
         if (identifierPossible && checkToken("IDENTIFIER")) {
@@ -117,9 +128,11 @@ public class ASTBuilder {
         node.setBody(checkToken("LEFT_CURLY_PAREN") ? parseBody(true) : parseExpression());
         return node;
     }
+
     private BodyNode parseBody() throws Exception {
         return parseBody(false);
     }
+
     private BodyNode parseBody(boolean functionBody) throws Exception {
         BodyNode node;
         if (functionBody) {
@@ -137,12 +150,14 @@ public class ASTBuilder {
         }, true));
         return node;
     }
+
     private UnaryNode parseUnary() throws Exception {
         UnaryNode unaryNode = new UnaryNode();
         unaryNode.setOperator(skipToken("OPERATOR").getValue());
         unaryNode.setValue(parseAtom());
         return unaryNode;
     }
+
     private NewNode parseNew() throws Exception {
         skipToken("NEW");
         NewNode newNode = new NewNode();
@@ -150,6 +165,7 @@ public class ASTBuilder {
         newNode.setArguments(parseArguments());
         return newNode;
     }
+
     private Collection<ParameterNode> parseParameters() throws Exception {
         return delimited("LEFT_PAREN", "COMMA", "RIGHT_PAREN", () -> {
             try {
@@ -160,10 +176,12 @@ public class ASTBuilder {
             }
         }).to(ParameterNode.class);
     }
+
     private ReturnNode parseReturn() throws Exception {
         skipToken("RETURN");
         return new ReturnNode(parseExpression());
     }
+
     private ParameterNode parseParameter() throws Exception {
         ParameterNode node = new ParameterNode();
         node.setExpanded(checkAndSkip("EXPAND") != null);
@@ -174,6 +192,7 @@ public class ASTBuilder {
         }
         return node;
     }
+
     private ImportNode parseImport() throws Exception {
         skipToken("IMPORT");
         ImportNode node = new ImportNode();
@@ -207,11 +226,12 @@ public class ASTBuilder {
         }
         return node;
     }
+
     private Collection<Map.Entry<String, String>> parseImports() throws Exception {
         return delimited(null, "COMMA", null, () -> {
             try {
                 String name = parseIdentifier();
-                String []pseudonym = new String[] {null};
+                String[] pseudonym = new String[]{null};
                 if (checkAndSkip("AS") != null) pseudonym[0] = parseIdentifier();
                 return new Map.Entry<String, String>() {
                     @Override
@@ -235,22 +255,27 @@ public class ASTBuilder {
             }
         });
     }
+
     private Node parseExpression() throws Exception {
         return maybeSomething(parseAtom(), 0);
     }
+
     private TryNode parseTry() throws Exception {
         TryNode tryNode = new TryNode();
         skipToken("TRY");
         tryNode.setToTry(checkToken("LEFT_CURLY_PAREN") ? parseBody() : parseExpression());
         if (checkAndSkip("CATCH") != null) tryNode.setToCatch(parseFunction(false));
-        if (checkAndSkip("FINALLY") != null) tryNode.setElseFinally(checkToken("LEFT_CURLY_PAREN") ? parseBody() : parseExpression());
+        if (checkAndSkip("FINALLY") != null)
+            tryNode.setElseFinally(checkToken("LEFT_CURLY_PAREN") ? parseBody() : parseExpression());
 
         return tryNode;
     }
+
     private ThrowNode parseThrow() throws Exception {
         skipToken("THROW");
         return new ThrowNode(parseExpression());
     }
+
     private ValueNode parseNumber() throws Exception {
         Token token = skipToken("NUMBER");
         return new ValueNode(
@@ -259,6 +284,7 @@ public class ASTBuilder {
                 )
         );
     }
+
     private Node maybeCallOrIndex(Supplier<Node> parser) throws Exception {
         Node expr = parser.get();
         while (true) {
@@ -271,6 +297,7 @@ public class ASTBuilder {
             }
         }
     }
+
     private IndexNode parseIndex(Node value) throws Exception {
         IndexNode indexNode = new IndexNode(value);
         skipToken("LEFT_SQUARE_PAREN");
@@ -285,6 +312,7 @@ public class ASTBuilder {
         skipToken("RIGHT_SQUARE_PAREN");
         return indexNode;
     }
+
     private Collection<Node> parseArguments() throws Exception {
         return delimited("LEFT_PAREN", "COMMA", "RIGHT_PAREN", () -> {
             try {
@@ -295,6 +323,7 @@ public class ASTBuilder {
             }
         });
     }
+
     private OperatorNode parseOperator() throws Exception {
         OperatorNode operatorNode = new OperatorNode();
         operatorNode.setBinary(checkToken("BINARY"));
@@ -310,12 +339,14 @@ public class ASTBuilder {
         }
         return operatorNode;
     }
+
     private CallNode parseCall(Node function) throws Exception {
         CallNode node = new CallNode();
         node.setFunction(function);
         node.setArguments(parseArguments());
         return node;
     }
+
     private IfNode parseIf() throws Exception {
         IfNode node = new IfNode();
         skipToken("IF");
@@ -327,7 +358,7 @@ public class ASTBuilder {
         } else {
             node.setThen(parseExpression());
         }
-        if(checkToken("ELSE")) {
+        if (checkToken("ELSE")) {
             skipToken("ELSE");
             if (checkToken("LEFT_CURLY_PAREN")) {
                 node.setOtherwise(parseBody());
@@ -337,9 +368,11 @@ public class ASTBuilder {
         }
         return node;
     }
+
     private Node parseAtom() throws Exception {
         return parseAtom(0);
     }
+
     private Node parseAtom(int precedence) throws Exception {
         if (precedence > functionPrecedence) {
             return parseNoCallAtom();
@@ -347,6 +380,7 @@ public class ASTBuilder {
             return maybeSomething(parseNoCallAtom(), functionPrecedence);
         }
     }
+
     private Node parseNoCallAtom() throws Exception {
         return maybePropertied(() -> {
             try {
@@ -393,7 +427,7 @@ public class ASTBuilder {
                     return parseWhile();
                 } else if (checkToken("FOR")) {
                     return parseFor();
-                }else if (checkToken("WHEN")){
+                } else if (checkToken("WHEN")) {
                     return parseWhen();
                 } else if (checkToken("OPERATOR")) {
                     return parseUnary();
@@ -410,6 +444,8 @@ public class ASTBuilder {
                     return parseTry();
                 } else if (checkToken("IDENTIFIER") || (tokenHolder.lookUp() != null && tokenHolder.lookUp().getRule().isKeyword())) {
                     return parseVariable();
+                } else if (checkToken("LEFT_CURLY_PAREN")) {
+                    return new PropertiedNode(false, new ValueNode(Value.NULL), parseProperties());
                 } else {
                     Token token = tokenHolder.lookUp();
                     if (token.getRule().getParse() != null) {
@@ -443,6 +479,15 @@ public class ASTBuilder {
                                     }
                                 }
                         ));
+                        scope.defVariable("parse_expression", new Value(
+                                new PSLFunction() {
+                                    @Override
+                                    public Value apply(Collection<Value> t) throws Exception {
+                                        Node node = parseExpression();
+                                        return nodeToPSL(node);
+                                    }
+                                }
+                        ));
                         Value funcVal;
                         try {
                             funcVal = Evaluator.evaluate(func, scope);
@@ -471,7 +516,7 @@ public class ASTBuilder {
         });
     }
 
-    private Node parseWhen() throws Exception{
+    private Node parseWhen() throws Exception {
         WhenNode whenNode = new WhenNode();
         skipToken("WHEN");
         skipToken("LEFT_CURLY_PAREN");
@@ -514,6 +559,7 @@ public class ASTBuilder {
         }
         return forNode;
     }
+
     private WhileNode parseWhile() throws Exception {
         WhileNode whileNode = new WhileNode();
         skipToken("WHILE");
@@ -527,6 +573,7 @@ public class ASTBuilder {
         }
         return whileNode;
     }
+
     private ArrayNode parseArray() throws Exception {
         ArrayNode arrayNode = new ArrayNode();
         arrayNode.setArray(delimited("LEFT_SQUARE_PAREN", "COMMA", "RIGHT_SQUARE_PAREN", () -> {
@@ -539,6 +586,7 @@ public class ASTBuilder {
         }));
         return arrayNode;
     }
+
     private ClassNode parseClass() throws Exception {
         skipToken("CLASS");
         ClassNode classNode = new ClassNode();
@@ -554,12 +602,13 @@ public class ASTBuilder {
             }
         }, true);
         HashMap<String, ClassFieldNode> map = new HashMap<>();
-        for (Map.Entry<String, ClassFieldNode> entry: collection) {
+        for (Map.Entry<String, ClassFieldNode> entry : collection) {
             map.put(entry.getKey(), entry.getValue());
         }
         classNode.setFields(map);
         return classNode;
     }
+
     private SwitchNode parseSwitch() throws Exception {
         SwitchNode switchNode = new SwitchNode();
         skipToken("SWITCH");
@@ -576,6 +625,7 @@ public class ASTBuilder {
         }));
         return switchNode;
     }
+
     private SwitchBranchNode parseSwitchBranch() throws Exception {
         SwitchBranchNode switchBranchNode = new SwitchBranchNode();
         Collection<Node> values = new Collection<>();
@@ -592,6 +642,7 @@ public class ASTBuilder {
         switchBranchNode.setThen(checkToken("LEFT_CURLY_BRACE") ? parseBody() : parseExpression());
         return switchBranchNode;
     }
+
     private Map.Entry<String, ClassFieldNode> parseClassField() throws Exception {
         ClassFieldNode classFieldNode = new ClassFieldNode();
 
@@ -607,15 +658,15 @@ public class ASTBuilder {
         }
 
         while (true) {
-                if (checkAndSkip("GET") != null) {
-                    if (checkToken("LEFT_CURLY_PAREN")) {
-                        classFieldNode.setGetAction(parseBody(true));
-                    }
-                } else if (checkAndSkip("SET") != null) {
-                    if (checkToken("LEFT_CURLY_PAREN")) {
-                        classFieldNode.setSetAction(parseBody(true));
-                    }
-                } else break;
+            if (checkAndSkip("GET") != null) {
+                if (checkToken("LEFT_CURLY_PAREN")) {
+                    classFieldNode.setGetAction(parseBody(true));
+                }
+            } else if (checkAndSkip("SET") != null) {
+                if (checkToken("LEFT_CURLY_PAREN")) {
+                    classFieldNode.setSetAction(parseBody(true));
+                }
+            } else break;
         }
 
         return new Map.Entry<String, ClassFieldNode>() {
@@ -635,12 +686,14 @@ public class ASTBuilder {
             }
         };
     }
+
     private Node maybePropertied(Supplier<Node> lambda) throws Exception {
         Node node = lambda.get();
         if (checkToken("LEFT_CURLY_PAREN") || checkToken("OVERRIDE")) {
             return new PropertiedNode(checkAndSkip("OVERRIDE") != null, node, parseProperties());
         } else return node;
     }
+
     private HashMap<String, Node> parseProperties() throws Exception {
         Collection<Map.Entry<String, Node>> properties =
                 delimited("LEFT_CURLY_PAREN", "COMMA", "RIGHT_CURLY_PAREN", () -> {
@@ -652,15 +705,18 @@ public class ASTBuilder {
                     }
                 }, true);
         HashMap<String, Node> result = new HashMap<>();
-        for (Map.Entry<String, Node> property: properties) {
+        for (Map.Entry<String, Node> property : properties) {
             result.put(property.getKey(), property.getValue());
         }
         return result;
     }
+
     private Map.Entry<String, Node> parseProperty() throws Exception {
         String name = parseIdentifier();
-        skipToken("CAST_OPERATOR");
-        Node value = parseExpression();
+        Node[] value = new Node[] {null};
+        if (checkAndSkip("COLON") != null) {
+            value[0] = parseExpression();
+        }
         return new Map.Entry<String, Node>() {
             @Override
             public String getKey() {
@@ -669,15 +725,16 @@ public class ASTBuilder {
 
             @Override
             public Node getValue() {
-                return value;
+                return value[0];
             }
 
             @Override
             public Node setValue(Node value1) {
-                return value;
+                return value1;
             }
         };
     }
+
     private ExportNode parseExport() throws Exception {
         skipToken("EXPORT");
         Node expression = parseExpression();
@@ -688,9 +745,11 @@ public class ASTBuilder {
         }
         return new ExportNode(expression, as);
     }
+
     private VariableNode parseVariable() throws Exception {
         return new VariableNode(parseIdentifier());
     }
+
     private String parseIdentifier() throws Exception {
         Token token = tokenHolder.lookUp();
         if (token.getRule().isKeyword() || token.getName().equals("IDENTIFIER")) {
@@ -698,6 +757,7 @@ public class ASTBuilder {
             return token.getValue();
         } else throw new Exception("Not an identifier");
     }
+
     private ValueNode parseString() throws Exception {
         Token token = skipToken("STRING");
         return new ValueNode(
@@ -710,6 +770,7 @@ public class ASTBuilder {
                 )
         );
     }
+
     private Node maybeBinary(Node left, int myPrecedence) throws Exception {
         if (nextOperator()) {
             Token operator = tokenHolder.lookUp();
@@ -735,6 +796,7 @@ public class ASTBuilder {
         }
         return left;
     }
+
     private Node maybeSomething(Node expr, int myPrecedence) throws Exception {
         while (true) {
             if (checkToken("LEFT_PAREN")) {
@@ -770,12 +832,21 @@ public class ASTBuilder {
             }
         }
     }
+
     private Value tokenToPSL(Token token) throws Exception {
         Value returnValue = new Value(token.getName());
         returnValue.put("name", new Value(token.getName()));
         returnValue.put("value", new Value(token.getValue()));
         return returnValue;
     }
+
+    private Value nodeToPSL(Node node) throws Exception {
+        Value returnValue = new Value();
+        returnValue.put("type", new Value(node.getType()));
+        returnValue.put("node", new Value(node));
+        return returnValue;
+    }
+
     private boolean nextOperator() {
         return checkToken("OPERATOR");
     }
