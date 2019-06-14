@@ -12,7 +12,7 @@ public class Collection<T> extends ArrayList<T> {
         super(k);
     }
     public Collection(T... args) {
-        super(Arrays.asList(args));
+        this(Arrays.asList(args));
     }
     public Collection(List<T> list) {
         super(list);
