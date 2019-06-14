@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
+import java.util.concurrent.CountDownLatch;
 
 public class HTTPLibBuilder extends LibBuilder {
     public static void main(String[] args) throws Exception {
@@ -26,6 +27,7 @@ public class HTTPLibBuilder extends LibBuilder {
                         HttpServer httpServer = HttpServer.create();
                         httpServer.bind(new InetSocketAddress(port), 0);
                         HttpContext httpContext = httpServer.createContext(path, httpExchange -> {
+                            httpExchange.sendResponseHeaders(200, 0);
                             Value request = new Value();
                             Value response = new Value();
                             String query = httpExchange.getRequestURI().getQuery();
@@ -47,6 +49,7 @@ public class HTTPLibBuilder extends LibBuilder {
                             } catch (Exception e) {
                                 e.printStackTrace();
                             }
+                            CountDownLatch latch = new CountDownLatch(1);
                             OutputStream outputStream = httpExchange.getResponseBody();
                             try {
                                 response.put("send", new Value(
@@ -65,12 +68,18 @@ public class HTTPLibBuilder extends LibBuilder {
                                             @Override
                                             public Value apply(Collection<Value> t, Environment environment) throws Exception {
                                                 outputStream.close();
+                                                latch.countDown();
                                                 return Value.NULL;
                                             }
                                         }
                                 ));
                                 handler.apply(new Collection<>(request, response), environment);
                             } catch (Exception e) {
+                                e.printStackTrace();
+                            }
+                            try {
+                                latch.await();
+                            } catch (InterruptedException e) {
                                 e.printStackTrace();
                             }
                         });
